@@ -2,11 +2,9 @@
 #include "shell.h"
 
 void main(){
-    // Todo : Implement mini UART
+    // Initialize mini UART
     muart_init();
 
-    // Todo : Simple Shell
+    // Start Simple Shell
     shell();
-    
-    // Todo : Mailbox
 }

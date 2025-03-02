@@ -9,7 +9,5 @@
 */
 int strcmp(const char*, const char*);
 
-/* Write the C string str to the transmit FIFO by mini UART */ 
-void puts(const char*);
 
 #endif

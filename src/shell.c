@@ -2,37 +2,47 @@
 #include "utils.h"
 #include "string.h"
 #include "muart.h"
+#include "mailbox.h"
 
-// Declaration
+// Declaration of command
 static int cmd_help(void);
 static int cmd_hello(void);
 static int cmd_reboot(void);
+static int cmd_mailbox(void);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
     {"help", "\t: print this help menu\n", cmd_help},
     {"hello", "\t: print Hello World !\n", cmd_hello},
     {"reboot", "\t: reboot the device\n", cmd_reboot},
+    {"mailbox", "\t: show the mailbox info\n", cmd_mailbox},
     {NULL, NULL, NULL}
 };
 
+// Definition of command
 static int cmd_help(void){
     for(const cmd_t* cmdTable_entry = cmdTable;
         cmdTable_entry->name != NULL; 
         cmdTable_entry++ ){
-        puts(cmdTable_entry->name);
-        puts(cmdTable_entry->description);
+        muart_puts(cmdTable_entry->name);
+        muart_puts(cmdTable_entry->description);
     }
     return 0;
 }
 
 static int cmd_hello(void){
-    puts("Hello World ! \n");
+    muart_puts("Hello World ! \n");
     return 0;
 }
 
 static int cmd_reboot(void){
-    puts("Reboot the Raspi .... \n");
+    muart_puts("Reboot the Raspi .... \n");
+    return 0;
+}
+
+static int cmd_mailbox(void){
+    get_board_revision();
+    get_memory_info();
     return 0;
 }
 
@@ -47,23 +57,23 @@ void exec_cmd(const char* cmd){
             return;
         }
     }
-    puts("Command not found: ");
-    puts(cmd);
-    puts(" Type help to see all available commands \n");
+    muart_puts("Command not found: ");
+    muart_puts(cmd);
+    muart_puts(" Type help to see all available commands \n");
     return;
 }
 
 
 void shell(){
-    puts("Welcome to OSC simple shell !!!\n");
-    puts("Type help to see all available commands \n");
+    muart_puts("Welcome to OSC simple shell !!!\n");
+    muart_puts("Type help to see all available commands \n");
     
     // Start shell
     while(1){
         char buffer[64] = {0};
         int i = 0;
         char c = ' ';
-        puts("# ");
+        muart_puts("# ");
 
         // Get the input in a line
         while(1){
@@ -72,13 +82,13 @@ void shell(){
             // Press "Backspace"
             if ((c == '\b' || c == 127)){
                 if(i>0){
-                    puts("\b \b");
+                    muart_puts("\b \b");
                     i--;               // The index in buffer should be moved forward 
                 }
             }
             // Press "Enter"
             else if (c == '\r'){    
-                puts("\n");
+                muart_puts("\n");
                 // Execute command
                 exec_cmd(buffer);
                 break;

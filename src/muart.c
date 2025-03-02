@@ -19,6 +19,39 @@ void muart_send(const char c){
     return;
 }
 
+void muart_puts(const char* str) {
+    while(*str){
+        muart_send(*str);
+        str++;
+    }
+    return;
+}
+
+void muart_send_hex(unsigned int value) {
+    // Display prefix of hex
+    muart_send('0');
+    muart_send('x');
+    
+    char hex_digits[8];
+    
+    for (int i = 7; i >= 0; i--) {
+        int hex_digit = value & 0xF; // Get the lower 4 bits
+        if (hex_digit < 10){
+            // Convert to char by ASCII code  
+            hex_digits[i] = '0' + hex_digit;
+        }
+        else
+            hex_digits[i] = 'a' + (hex_digit - 10);
+        
+        value = value >> 4; // right shift 4 bits
+    }
+    
+    // Display the value using muart_send
+    for (int i = 0; i < 8; i++) {
+        muart_send(hex_digits[i]);
+    }
+}
+
 void muart_init(){
     // Set GPIO pin 14 15 to ALT5
     int reg;

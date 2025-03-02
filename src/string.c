@@ -1,3 +1,4 @@
+#include "string.h"
 #include "muart.h"
 
 int strcmp(const char* str1 , const char* str2){
@@ -14,13 +15,4 @@ int strcmp(const char* str1 , const char* str2){
     }while( c1 == c2 );
     
     return c1 - c2;
-}
-
-
-void puts(const char* str) {
-    while(*str){
-        muart_send(*str);
-        str++;
-    }
-    return;
 }

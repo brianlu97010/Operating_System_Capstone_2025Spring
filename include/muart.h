@@ -10,4 +10,10 @@ void muart_send(const char);
 /* Initialize the mini UART */
 void muart_init();
 
+/* Write the C string str to the transmit FIFO by mini UART */ 
+void muart_puts(const char*);
+
+/* Transmit the int data to host in hex */
+void muart_send_hex(unsigned int);
+
 #endif

@@ -1,3 +1,5 @@
+#include "utils.h"
+
 void regWrite(volatile unsigned int* addr, int val){
     *addr = val;
     return;
