@@ -83,7 +83,8 @@ void shell(){
             if ((c == '\b' || c == 127)){
                 if(i>0){
                     muart_puts("\b \b");
-                    i--;               // The index in buffer should be moved forward 
+                    i--;               // The index in buffer should be moved forward
+                    buffer[i] = 0;
                 }
             }
             // Press "Enter"
