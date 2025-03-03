@@ -26,8 +26,11 @@ Or use the debug script:
 ```
 
 ## Demo
+### Initializtion
+![init](assets/demo_init.png)
+
 ### Shell
-![demo](assets/demo_shell.png)
+![shell](assets/demo_shell.png)
 
 ### Mailbox
 ![mailbox](assets/demo_mailbox.png)
