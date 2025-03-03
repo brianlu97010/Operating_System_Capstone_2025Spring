@@ -12,10 +12,10 @@ static int cmd_mailbox(void);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
-    {"help", "\t: print this help menu\n", cmd_help},
-    {"hello", "\t: print Hello World !\n", cmd_hello},
-    {"reboot", "\t: reboot the device\n", cmd_reboot},
-    {"mailbox", "\t: show the mailbox info\n", cmd_mailbox},
+    {"help",    "\t: print this help menu\n",   cmd_help},
+    {"hello",   "\t: print Hello World !\n",    cmd_hello},
+    {"reboot",  "\t: reboot the device\n",      cmd_reboot},
+    {"mailbox", "\t: show the mailbox info\n",  cmd_mailbox},
     {NULL, NULL, NULL}
 };
 

@@ -29,6 +29,9 @@ kernel8.img: $(SRCDIR)linker.ld $(OBJFILES)
 	$(LD) -T $(SRCDIR)linker.ld $(OBJFILES) -o $(SRCDIR)kernel8.elf
 	$(OBJCOPY) $(SRCDIR)kernel8.elf -O binary kernel8.img
 
+run: kernel8.img 
+	qemu-system-aarch64 -m 1024 -M raspi3b -serial null -serial stdio -display none  -kernel kernel8.img 
+
 debug: CFLAGS += -g 
 debug: ASMFLAGS += -g
 debug: kernel8.debug.img
@@ -37,6 +40,3 @@ debug: kernel8.debug.img
 kernel8.debug.img: $(SRCDIR)linker.ld $(OBJFILES)
 	$(LD) -T $(SRCDIR)linker.ld $(OBJFILES) -o $(SRCDIR)kernel8.debug.elf
 	$(OBJCOPY) $(SRCDIR)kernel8.debug.elf -O binary kernel8.debug.img
-
-run: kernel8.img 
-	qemu-system-aarch64 -m 1024 -M raspi3b -serial null -serial stdio -display none  -kernel kernel8.img 
