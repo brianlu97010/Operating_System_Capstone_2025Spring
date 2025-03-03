@@ -65,7 +65,7 @@ void exec_cmd(const char* cmd){
 
 
 void shell(){
-    muart_puts("Welcome to OSC simple shell !!!\n");
+    muart_puts("\nWelcome to OSC simple shell !!!\n");
     muart_puts("Type help to see all available commands \n");
     
     // Start shell
