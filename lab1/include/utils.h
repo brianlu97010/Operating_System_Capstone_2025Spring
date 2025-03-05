@@ -11,8 +11,8 @@
 #endif
 
 /* Register operations */
-void regWrite(volatile unsigned int* addr, int val);
-int regRead(volatile unsigned int* addr);
+void regWrite(long addr, int val);
+int regRead(long addr);
 void waitCycle(unsigned int cycles);
 
 #endif

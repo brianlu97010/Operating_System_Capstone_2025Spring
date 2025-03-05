@@ -1,12 +1,14 @@
 #include "utils.h"
 
-void regWrite(volatile unsigned int* addr, int val){
-    *addr = val;
+void regWrite(long addr, int val){
+    volatile unsigned int* addr_ptr = (unsigned int*)addr;
+    *addr_ptr = val;
     return;
 }
 
-int regRead(volatile unsigned int* addr){
-    return *addr;
+int regRead(long addr){
+    volatile unsigned int* addr_ptr = (unsigned int*)addr;
+    return *addr_ptr;
 }
 
 void waitCycle(unsigned int cycles) {
