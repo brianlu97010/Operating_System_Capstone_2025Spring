@@ -12,10 +12,10 @@ static int cmd_mailbox(void);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
-    {"help",    "\t: print this help menu\n",   cmd_help},
-    {"hello",   "\t: print Hello World !\n",    cmd_hello},
-    {"reboot",  "\t: reboot the device\n",      cmd_reboot},
-    {"mailbox", "\t: show the mailbox info\n",  cmd_mailbox},
+    {"help",    "\t: print this help menu\r\n",   cmd_help},
+    {"hello",   "\t: print Hello World !\r\n",    cmd_hello},
+    {"reboot",  "\t: reboot the device\r\n",      cmd_reboot},
+    {"mailbox", "\t: show the mailbox info\r\n",  cmd_mailbox},
     {NULL, NULL, NULL}
 };
 
@@ -31,12 +31,12 @@ static int cmd_help(void){
 }
 
 static int cmd_hello(void){
-    muart_puts("Hello World ! \n");
+    muart_puts("Hello World ! \r\n");
     return 0;
 }
 
 static int cmd_reboot(void){
-    muart_puts("Reboot the Raspi .... \n");
+    muart_puts("Reboot the Raspi .... \r\n");
     return 0;
 }
 
@@ -59,14 +59,14 @@ void exec_cmd(const char* cmd){
     }
     muart_puts("Command not found: ");
     muart_puts(cmd);
-    muart_puts(" Type help to see all available commands \n");
+    muart_puts(" Type help to see all available commands \r\n");
     return;
 }
 
 
 void shell(){
-    muart_puts("\nWelcome to OSC simple shell !!!\n");
-    muart_puts("Type help to see all available commands \n");
+    muart_puts("\r\nWelcome to OSC simple shell !!!\r\n");
+    muart_puts("Type help to see all available commands \r\n");
     
     // Start shell
     while(1){
@@ -89,7 +89,7 @@ void shell(){
             }
             // Press "Enter"
             else if (c == '\r'){    
-                muart_puts("\n");
+                muart_puts("\r\n");
                 // Execute command
                 exec_cmd(buffer);
                 break;

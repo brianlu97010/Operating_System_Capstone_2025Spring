@@ -51,10 +51,10 @@ void get_board_revision(){
     if(mailbox[1] == REQUEST_SUCCEED) {
         muart_puts("Board Revision : ");    // it should be 0xa020d3 for rpi3 b+
         muart_send_hex(mailbox[5]);
-        muart_puts("\n");
+        muart_puts("\r\n");
     } else {
         // Request is failed
-        muart_puts("Request is failed\n");
+        muart_puts("Request is failed\r\n");
     }
 }
 
@@ -78,12 +78,12 @@ void get_memory_info(){
     if(mailbox[1] == REQUEST_SUCCEED) {
         muart_puts("ARM memory base address : ");
         muart_send_hex(mailbox[5]);
-        muart_puts("\n");
+        muart_puts("\r\n");
         muart_puts("ARM memory size : ");
         muart_send_hex(mailbox[6]);
-        muart_puts("\n");
+        muart_puts("\r\n");
     } else {
         // Request is failed
-        muart_puts("Request is failed\n");
+        muart_puts("Request is failed\r\n");
     }
 }

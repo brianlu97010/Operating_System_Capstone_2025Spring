@@ -30,5 +30,5 @@ busy_loop:
 setmemtozero:
     str xzr, [x1], #8
     cmp x2, x1
-    bgt setmemtozero
+    b.gt setmemtozero
     ret

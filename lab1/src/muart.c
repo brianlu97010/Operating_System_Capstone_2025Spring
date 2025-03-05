@@ -54,12 +54,12 @@ void muart_send_hex(unsigned int value) {
 
 void muart_init(){
     // Set GPIO pin 14 15 to ALT5
-    int reg;
+    unsigned int reg;
     reg = regRead(GPFSEL1);
     reg &= ~(7<<12);        // GPIO 14
-    reg |= 5<<12;
+    reg |= 2<<12;
     reg &= ~(7<<15);        // GPIO 15
-    reg |= 5<<15;
+    reg |= 2<<15;
     regWrite(GPFSEL1, reg);
 
     // Disable GPIO pull up/down
