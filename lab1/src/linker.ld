@@ -7,10 +7,15 @@ SECTIONS
     .rodata : { *(.rodata) }
     .data : { *(.data) }
 
-    . = ALIGN(0x8);
+    . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */
     bss_begin = .;
     .bss (NOLOAD) : { *(.bss) }
     bss_end = .;
-    _end = .;
 
+    /* Initialize the address and size of stack */
+    . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */
+    . = . + 0x400000; /* Allocate 4MB to stack */
+    stack_top = .;   /* Stack grows from up to down */
+
+    _end = .;
 }

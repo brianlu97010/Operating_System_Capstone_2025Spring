@@ -14,9 +14,8 @@ primary_core:
     adr x2, bss_end
     bl setmemtozero
 
-    // Initialize the stack pointer to 4MB
-    adr x3, _start
-    add x3, x3, #0x400000
+    // Initialize the stack pointer to 4MB, using the sybmol defined in linker script
+    ldr x3, =stack_top
     mov sp, x3
 
     // Jump to main function
