@@ -66,7 +66,7 @@ void get_memory_info(){
     mailbox[1] = REQUEST_CODE;
     // tags begin
     mailbox[2] = GET_ARM_MEMORY;     // tag identifier
-    mailbox[3] = 4;                  // maximum of request and response value buffer's length. (in bytes)
+    mailbox[3] = 8;                  // reponse length 
     mailbox[4] = TAG_REQUEST_CODE;
     mailbox[5] = 0;                  // value buffer
     mailbox[6] = 0;
