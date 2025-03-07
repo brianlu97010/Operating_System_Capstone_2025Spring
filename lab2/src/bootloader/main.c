@@ -34,11 +34,11 @@ void bootloader_main(){
     for (int i = 0; i < header.size; i++) {
         rec_checksum += kernel_ptr[i];
     }
-    // rec_checksum &= 0xFF;
+    rec_checksum &= 0xFF;
     
 
     if (rec_checksum != header.checksum) {
-        // return;
+        return;
     }
     
     // Jump to kernel using function pointer
