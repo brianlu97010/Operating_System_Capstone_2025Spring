@@ -25,7 +25,7 @@ sudo screen /dev/ttyUSB0 115200
 ```
 
 ### Emualate on qemu
-> Known issue : issue #3
+> Known issue : issue [#3](https://github.com/brianlu97010/Operating_System_Capstone_2025Spring/issues/3)
 
 Compile and run:
 ```bash
