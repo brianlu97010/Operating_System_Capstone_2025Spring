@@ -1,5 +1,5 @@
 # OSC 2025 | Lab 2 : Booting
-## Exercise 2
+## Exercise 2 UART Bootloader
 ### Steps
 1. GPU executes **the first stage bootloader** from ROM on the SoC.
 2. The first stage bootloader recognizes the FAT16/32 file system and **loads the second stage bootloader** `bootcode.bin` from SD card to L2 cache.
@@ -25,7 +25,7 @@ sudo screen /dev/ttyUSB0 115200
 ```
 
 ### Emualate on qemu
-> Known issue : issue#
+> Known issue : issue #3
 
 Compile and run:
 ```bash
