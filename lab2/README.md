@@ -1,5 +1,6 @@
 # OSC 2025 | Lab 2 : Booting
 ## Exercise 1: Reboot
+
 ### Using the Kernel Shell
 When you connect to the Raspberry Pi 3, you'll see the kernel shell welcome message:
 
@@ -21,15 +22,31 @@ mailbox : show the mailbox info
 ### Rebooting the Raspberry Pi 3
 Simply run the `reboot` command to restart your Raspberry Pi 3.
 
-### Important Notes for UART Bootloader
+### Important Notes for UART Bootloader Users
 When using the UART bootloader:
 - After reboot, the bootloader will wait for a new kernel to be transmitted
-- If you're monitoring the Raspberry Pi with `screen`, you must properly close the connection before sending a new kernel image:
-  1. Press `Ctrl + A`, then `\`
-  2. Confirm by typing `y`
-  3. Only then run the python script to send another kernel image
+- You must properly close your terminal connection before sending a new kernel image
+
+#### Using Screen
+If you're monitoring the Raspberry Pi with `screen`:
+1. Press `Ctrl + A`, then `\`
+2. Confirm by typing `y`
+3. Only then run the python script to send another kernel image
 
 This proper disconnection prevents the "Device or resource busy" error that occurs when trying to access `/dev/ttyUSB0` while it's still in use by another process.
+
+#### Using Minicom (Recommand to debug)
+You can also use `minicom` which often provides more reliable device handling (this methond can keep monitoring when using python script transmit the kernel image) :
+```
+sudo apt-get install minicom        # Install minicom
+sudo minicom -D /dev/ttyUSB0 -b 115200  # Connect to Raspberry Pi
+```
+
+To exit minicom properly:
+1. Press `Ctrl + A`, then `X`
+2. Confirm exit
+3. Run the python script to send another kernel image
+
 
 ## Exercise 2: UART Bootloader
 ### Steps
