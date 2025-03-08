@@ -40,7 +40,7 @@ void bootloader_main(){
     if (rec_checksum != header.checksum) {
         return;
     }
-    
+
     // Jump to kernel using function pointer
     void (*kernel_entry)(void) = (void (*)(void))KERNEL_LOAD_ADDR;
     kernel_entry();

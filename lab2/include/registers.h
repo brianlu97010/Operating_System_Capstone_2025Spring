@@ -40,4 +40,13 @@
 #define TAG_REQUEST_CODE        0x00000000
 #define END_TAG                 0x00000000
 
+/* Power management */
+#define PM_BASE		            (MMIO_BASE + 0x100000)  // 0x3F100000
+#define PM_RSTC		            (PM_BASE + 0x1C)        // ReSeT Control register
+#define PM_RSTS		            (PM_BASE + 0x20)        // ReSeT Status register
+#define PM_WDOG		            (PM_BASE + 0x24)        // WatchDOG timer register
+#define PM_PASSWD		        (0x5A << 24)            // 0x5a000000, any writing operation to WDT register needs this password
+#define PM_RSTC_CLEAR	        0xFFFFFFCF
+#define PM_RSTC_REBOOT	        0x00000020              // full reset
+
 #endif

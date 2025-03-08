@@ -3,6 +3,7 @@
 #include "string.h"
 #include "muart.h"
 #include "mailbox.h"
+#include "reboot.h"
 
 // Declaration of command
 static int cmd_help(void);
@@ -37,6 +38,7 @@ static int cmd_hello(void){
 
 static int cmd_reboot(void){
     muart_puts("Reboot the Raspi .... \r\n");
+    reset();
     return 0;
 }
 
@@ -65,6 +67,9 @@ void exec_cmd(const char* cmd){
 
 
 void shell(){
+    // Waiting for the user type anything in screen
+    muart_receive();
+    
     muart_puts("\r\nWelcome to OSC simple shell !!!\r\n");
     muart_puts("Type help to see all available commands \r\n");
     
