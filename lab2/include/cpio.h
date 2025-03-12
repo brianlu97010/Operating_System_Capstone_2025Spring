@@ -4,7 +4,7 @@
 #define CPIO_MAGIC              "070701"
 #define CPIO_TRAILER            "TRAILER!!!"
 
-#define RASPI 0
+#define RASPI 1
 #if RASPI
 #define INITRANFS_ADDR          0x20000000 // the memory address where the cpio file load into, defined in config.txt
 #else 
