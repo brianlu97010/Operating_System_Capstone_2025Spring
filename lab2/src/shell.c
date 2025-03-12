@@ -4,12 +4,15 @@
 #include "muart.h"
 #include "mailbox.h"
 #include "reboot.h"
+#include "cpio.h"
 
 // Declaration of command
 static int cmd_help(void);
 static int cmd_hello(void);
 static int cmd_reboot(void);
 static int cmd_mailbox(void);
+static int cmd_ls(void);
+static int cmd_cat(void);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
@@ -17,6 +20,8 @@ static const cmd_t cmdTable[] = {
     {"hello",   "\t: print Hello World !\r\n",    cmd_hello},
     {"reboot",  "\t: reboot the device\r\n",      cmd_reboot},
     {"mailbox", "\t: show the mailbox info\r\n",  cmd_mailbox},
+    {"ls",      "\t: List information about the FILEs (the current directory by default).\r\n", cmd_ls},
+    {"cat",     "\t: View the content of the file \r\n", cmd_cat},
     {NULL, NULL, NULL}
 };
 
@@ -45,6 +50,18 @@ static int cmd_reboot(void){
 static int cmd_mailbox(void){
     get_board_revision();
     get_memory_info();
+    return 0;
+}
+
+static int cmd_ls(void){
+    void* initranfs_addr = (void*)INITRANFS_ADDR;
+    cpio_ls(initranfs_addr);
+    return 0;
+}
+
+static int cmd_cat(void){
+    void* initranfs_addr = (void*)INITRANFS_ADDR;
+    cpio_cat(initranfs_addr, "file2.txt");
     return 0;
 }
 
