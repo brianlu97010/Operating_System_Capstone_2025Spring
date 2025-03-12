@@ -84,4 +84,69 @@ make clean && make run
  qemu-system-aarch64 -machine raspi3b -kernel bootloader.img -serial null -seria pty
 ```
 
+## Exercise 3: Initial Ramdisk
+### Creating Test Files
+First, create a test directory with some files to include in the CPIO archive:
+
+```bash
+mkdir -p rootfs
+echo "File name: file1\nThis is file1." > rootfs/file1
+echo "hahahaahahahahahah" > rootfs/file2.txt
+
+# Create the CPIO archive
+cd rootfs
+find . | cpio -o -H newc > ../initramfs.cpio
+cd ..
+```
+
+### Deploying on Raspberry Pi 3B+
+
+1. **Configure the SD Card**:
+   - Copy the CPIO archive (`initramfs.cpio`) to the boot partition of your SD card
+   - Add this line to `config.txt` to specify the loading address and the ramfs filename:
+     ```
+     initramfs initramfs.cpio 0x20000000
+     ```
+
+2. **Configure the Code**:
+   - Modify [include/cpio.h](include/cpio.h) to use the Raspberry Pi hardware configuration:
+     ```c
+     #define RASPI 1
+     ```
+   - This setting ensures the correct memory address is used for accessing the CPIO archive
+
+### Emulating with QEMU
+
+1. **Configure the Code**:
+   - Modify [include/cpio.h](include/cpio.h) to use the QEMU configuration:
+     ```c
+     #define RASPI 0
+     ```
+
+2. **Run the Emulation**:
+   ```bash
+   qemu-system-aarch64 -m 1024 -M raspi3b -serial null -serial stdio -display none -kernel kernel8.img -initrd initramfs.cpio
+   ```
+
+### Shell Commands
+
+Once the system is running, you can use these commands to interact with the CPIO archive:
+
+- `ls` - List all files in the CPIO archive
+- `cat <filename>` - View the content of a specified file
+
+Example usage:
+```
+# ls
+.
+file2.txt
+file1
+
+# cat file1
+File name: file1
+This is file1.
+```
+
+## Exercise 4: 
+
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/AaJgSZKl)
