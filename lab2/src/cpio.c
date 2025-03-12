@@ -36,7 +36,7 @@ void cpio_ls(const void* cpio_file_addr){
 
     while(1){
         header = (cpio_newc_header*)current_addr; 
-        
+
         // Get the pathname size from the header and convert it to unsigned int
         unsigned int pathname_size = cpio_hex_to_int(header->c_namesize, 8);
 
@@ -58,6 +58,7 @@ void cpio_ls(const void* cpio_file_addr){
         // Move to the next entry
         current_addr = current_addr + sizeof(cpio_newc_header) + pathname_size + cpio_padded_size(filedata_size);
     }
+    return;
 }
 
 void cpio_cat(const void* cpio_file_addr, const char* file_name){
@@ -89,9 +90,14 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
                 muart_send(*(file_data+i));
             }
             muart_puts("\r\n");
+            return;
         }
 
         // Move to the next entry
         current_addr = current_addr + sizeof(cpio_newc_header) + pathname_size + cpio_padded_size(filedata_size);
     }
+    muart_puts("File not found: ");
+    muart_puts(file_name);
+    muart_puts("\r\n");
+    return;
 }
