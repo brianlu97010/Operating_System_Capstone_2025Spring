@@ -57,9 +57,9 @@ To exit minicom properly:
 5. `bootloader.img` will load the actual kernel image `kernel8.img` in `0x80000` through UART.
 
 ### Usage
-Compile and run:
+Compile:
 ```bash
-make clean && make run
+make clean && make
 ```
 Then, 
 1. Move the config.txt in src/bootloader to SD card.
@@ -72,16 +72,20 @@ Check whether the kernel is loaded successfully :
 ```bash
 sudo screen /dev/ttyUSB0 115200 
 ```
+or
+```bash
+sudo minicom -D /dev/ttyUSB0 -b 115200 
+```
 
 ### Emualate on qemu
 > Known issue : issue [#3](https://github.com/brianlu97010/Operating_System_Capstone_2025Spring/issues/3)
 
 Compile and run:
 ```bash
-make clean && make run
+make clean && make
 ```
 ```bash
- qemu-system-aarch64 -machine raspi3b -kernel bootloader.img -serial null -seria pty
+qemu-system-aarch64 -machine raspi3b -kernel bootloader.img -serial null -seria pty
 ```
 
 ## Exercise 3: Initial Ramdisk
@@ -108,25 +112,34 @@ cd ..
      initramfs initramfs.cpio 0x20000000
      ```
 
-2. **Configure the Code**:
-   - Modify [include/cpio.h](include/cpio.h) to use the Raspberry Pi hardware configuration:
-     ```c
-     #define RASPI 1
-     ```
-   - This setting ensures the correct memory address is used for accessing the CPIO archive
+2. **Compile the Code**:
+   ```bash
+   make raspi
+   ```
+   This sets `PLATFORM=raspi`, which applies the `-DRASPI` flag, ensuring the correct memory address for `initramfs` which is defined in [include/cpio.h](include/cpio.h).
+
+3. **Transfer the kerenl to Raspi through UART bootloader**
+   ```bash
+   python3 send_kernel.py kernel8.img /dev/ttyUSB0 
+   ```
 
 ### Emulating with QEMU
-
-1. **Configure the Code**:
-   - Modify [include/cpio.h](include/cpio.h) to use the QEMU configuration:
-     ```c
-     #define RASPI 0
-     ```
+1. **Compile the Code**:
+   ```bash
+   make qemu
+   ```
+   This sets `PLATFORM=qemu`, which does **not** define `-DRASPI`, using QEMU’s default memory address (`0x8000000`). which is defined in [include/cpio.h](include/cpio.h).
 
 2. **Run the Emulation**:
    ```bash
    qemu-system-aarch64 -m 1024 -M raspi3b -serial null -serial stdio -display none -kernel kernel8.img -initrd initramfs.cpio
    ```
+
+
+### Default Behavior
+
+- Running `make` without specifying a platform defaults to Raspberry Pi (`PLATFORM=raspi`).
+
 
 ### Shell Commands
 

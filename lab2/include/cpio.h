@@ -4,8 +4,7 @@
 #define CPIO_MAGIC              "070701"
 #define CPIO_TRAILER            "TRAILER!!!"
 
-#define RASPI 1
-#if RASPI
+#ifdef RASPI
 #define INITRANFS_ADDR          0x20000000 // the memory address where the cpio file load into, defined in config.txt
 #else 
 #define INITRANFS_ADDR          0x8000000  // QEMU loads the cpio archive file to 0x8000000 by default.

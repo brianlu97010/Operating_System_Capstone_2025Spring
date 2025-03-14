@@ -35,6 +35,21 @@ all: kernel8.img bootloader.img
 clean: 
 	rm -rf *.img $(KERNEL_SRCDIR)*.elf $(KERNEL_SRCDIR)*.o $(BOOT_SRCDIR)*.elf $(BOOT_SRCDIR)*.o $(SRCDIR)*.o
 
+# Default platform
+PLATFORM ?= raspi
+
+# Choose the platform (Raspi or QEMU)
+ifeq ($(PLATFORM),raspi)
+    CFLAGS += -DRASPI
+endif
+
+# Setting Platform
+qemu:
+	$(MAKE) PLATFORM=qemu
+
+raspi:
+	$(MAKE) PLATFORM=raspi
+
 # Common
 $(SRCDIR)%.o: $(SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -82,4 +97,3 @@ bootloader.debug.img: $(BOOT_SRCDIR)linker.ld $(BOOT_OBJFILES)
 kernel8.debug.img: $(KERNEL_SRCDIR)linker.ld $(KERNEL_OBJFILES)
 	$(LD) -T $(KERNEL_SRCDIR)linker.ld $(KERNEL_OBJFILES) -o $(KERNEL_SRCDIR)kernel8.debug.elf
 	$(OBJCOPY) $(KERNEL_SRCDIR)kernel8.debug.elf -O binary kernel8.debug.img
-
