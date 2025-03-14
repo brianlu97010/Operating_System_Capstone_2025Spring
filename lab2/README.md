@@ -2,7 +2,7 @@
 ## Exercise 1: Reboot
 
 ### Using the Kernel Shell
-When you connect to the Raspberry Pi 3, you'll see the kernel shell welcome message:
+When connecting to the Raspberry Pi 3, you'll see the kernel shell welcome message:
 
 ```
 Welcome to OSC simple shell !!!
@@ -20,14 +20,14 @@ mailbox : show the mailbox info
 ```
 
 ### Rebooting the Raspberry Pi 3
-Simply run the `reboot` command to restart your Raspberry Pi 3.
+Simply run the `reboot` command to restart the Raspberry Pi 3.
 
 ### Important Notes for UART Bootloader Users
 When using the UART bootloader:
 - After reboot, the bootloader will wait for a new kernel to be transmitted
-- You must properly close your terminal connection before sending a new kernel image
+- Must properly close your terminal connection before sending a new kernel image if using Screen to monitor.
 
-#### Using Screen
+#### Using Screen (Recommend to DEMO)
 If you're monitoring the Raspberry Pi with `screen`:
 1. Press `Ctrl + A`, then `\`
 2. Confirm by typing `y`
@@ -35,7 +35,7 @@ If you're monitoring the Raspberry Pi with `screen`:
 
 This proper disconnection prevents the "Device or resource busy" error that occurs when trying to access `/dev/ttyUSB0` while it's still in use by another process.
 
-#### Using Minicom (Recommand to debug)
+#### Using Minicom (Recommend to debug)
 You can also use `minicom` which often provides more reliable device handling (this methond can keep monitoring when using python script transmit the kernel image) :
 ```
 sudo apt-get install minicom        # Install minicom
@@ -62,8 +62,8 @@ Compile:
 make clean && make
 ```
 Then, 
-1. Move the config.txt in src/bootloader to SD card.
-2. Move the bootloader.img to SD card.
+1. Move the `config.txt` in [src/bootloader](src/bootloader) to SD card.
+2. Move the `bootloader.img` to SD card.
 3. Send the kernel image to Raspi 3 b+ : 
 ```bash
 python3 send_kernel.py kernel8.img /dev/ttyUSB0 
@@ -106,7 +106,7 @@ cd ..
 ### Deploying on Raspberry Pi 3B+
 
 1. **Configure the SD Card**:
-   - Copy the CPIO archive (`initramfs.cpio`) to the boot partition of your SD card
+   - Copy the CPIO archive `initramfs.cpio` to the boot partition of your SD card
    - Add this line to `config.txt` to specify the loading address and the ramfs filename:
      ```
      initramfs initramfs.cpio 0x20000000
@@ -116,7 +116,7 @@ cd ..
    ```bash
    make raspi
    ```
-   This sets `PLATFORM=raspi`, which applies the `-DRASPI` flag, ensuring the correct memory address for `initramfs` which is defined in [include/cpio.h](include/cpio.h).
+   This sets `PLATFORM=raspi`, which applies the `-DRASPI` flag, ensuring the correct memory address (`0x20000000`) for `initramfs` which is defined in [include/cpio.h](include/cpio.h).
 
 3. **Transfer the kerenl to Raspi through UART bootloader**
    ```bash
