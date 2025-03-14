@@ -178,8 +178,8 @@ void exec_cmd(const char* cmd_line){
 
 
 void shell(){
-    // Waiting for the user type anything in screen
-    muart_receive();
+    // Waiting for the user type anything in screen (if using screen monitor)
+    // muart_receive();
     
     muart_puts("\r\nWelcome to OSC simple shell !!!\r\n");
     muart_puts("Type help to see all available commands \r\n");

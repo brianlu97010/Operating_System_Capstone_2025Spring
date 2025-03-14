@@ -27,15 +27,7 @@ When using the UART bootloader:
 - After reboot, the bootloader will wait for a new kernel to be transmitted
 - Must properly close your terminal connection before sending a new kernel image if using Screen to monitor.
 
-#### Using Screen (Recommend to DEMO)
-If you're monitoring the Raspberry Pi with `screen`:
-1. Press `Ctrl + A`, then `\`
-2. Confirm by typing `y`
-3. Only then run the python script to send another kernel image
-
-This proper disconnection prevents the "Device or resource busy" error that occurs when trying to access `/dev/ttyUSB0` while it's still in use by another process.
-
-#### Using Minicom (Recommend to debug)
+#### Using Minicom (Recommend)
 You can also use `minicom` which often provides more reliable device handling (this methond can keep monitoring when using python script transmit the kernel image) :
 ```
 sudo apt-get install minicom        # Install minicom
@@ -46,6 +38,16 @@ To exit minicom properly:
 1. Press `Ctrl + A`, then `X`
 2. Confirm exit
 3. Run the python script to send another kernel image
+
+
+#### Using Screen
+If you're monitoring the Raspberry Pi with `screen`:
+1. Press `Ctrl + A`, then `\`
+2. Confirm by typing `y`
+3. Only then run the python script to send another kernel image
+
+This proper disconnection prevents the "Device or resource busy" error that occurs when trying to access `/dev/ttyUSB0` while it's still in use by another process.
+
 
 
 ## Exercise 2: UART Bootloader
@@ -70,12 +72,14 @@ python3 send_kernel.py kernel8.img /dev/ttyUSB0
 ```
 Check whether the kernel is loaded successfully : 
 ```bash
-sudo screen /dev/ttyUSB0 115200 
+sudo minicom -D /dev/ttyUSB0 -b 115200 
 ```
 or
 ```bash
-sudo minicom -D /dev/ttyUSB0 -b 115200 
+sudo screen /dev/ttyUSB0 115200 
 ```
+
+(Recommend using minicom.)
 
 ### Emualate on qemu
 > Known issue : issue [#3](https://github.com/brianlu97010/Operating_System_Capstone_2025Spring/issues/3)
