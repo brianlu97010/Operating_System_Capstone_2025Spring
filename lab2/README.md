@@ -89,7 +89,7 @@ Compile and run:
 make clean && make
 ```
 ```bash
-qemu-system-aarch64 -machine raspi3b -kernel bootloader.img -serial null -seria pty
+qemu-system-aarch64 -machine raspi3b -kernel bootloader.img -serial null -serial stdio -serial pty
 ```
 
 ## Exercise 3: Initial Ramdisk
