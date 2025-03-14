@@ -36,7 +36,7 @@ clean:
 	rm -rf *.img $(KERNEL_SRCDIR)*.elf $(KERNEL_SRCDIR)*.o $(BOOT_SRCDIR)*.elf $(BOOT_SRCDIR)*.o $(SRCDIR)*.o
 
 # Default platform
-PLATFORM ?= raspi
+PLATFORM ?= qemu
 
 # Choose the platform (Raspi or QEMU)
 ifeq ($(PLATFORM),raspi)

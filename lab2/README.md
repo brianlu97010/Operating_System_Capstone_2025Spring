@@ -138,7 +138,7 @@ cd ..
 
 ### Default Behavior
 
-- Running `make` without specifying a platform defaults to Raspberry Pi (`PLATFORM=raspi`).
+- Running `make` without specifying a platform defaults to qemu (`PLATFORM=qemu`).
 
 
 ### Shell Commands
@@ -160,6 +160,49 @@ File name: file1
 This is file1.
 ```
 
-## Exercise 4: 
+## Exercise 4: Simple Allocator
+### Pre-allocated Memory Pool
+
+The memory pool is defined in the linker script (`src/kernel/linker.ld`):
+
+```
+/* Define the heap section */
+. = ALIGN(0x8);
+heap_begin = .;
+. = . + 0x100000; /* Allocate 1MB for heap */
+heap_end = .;
+```
+
+This reserves 1MB of memory for our heap, placing it after the BSS section and before the stack.
+uring proper alignment and boundary checks.
+
+### Usage Example
+
+The allocator can be tested using the `memAlloc` shell command:
+
+```
+# memAlloc 20
+Allocated memory at: 0x00081a10
+
+# memAlloc 40
+Allocated memory at: 0x00081a28
+```
+
+Notice that the simple allocator implements the 8-byte alignment to ensure proper access for 64-bit ARMv8 operations in Raspi 3b+.
+
+### Symbol Table Analysis
+
+Using `nm -n src/kernel/kernel8.elf`, we can observe the memory layout:
+
+```
+-----------    Heap Section    -----------
+0000000000081a00 D heap_begin
+0000000000181a00 D heap_end
+```
+
+This confirms our heap is positioned correctly in memory, starting at address 0x81a10 and ending at 0x181a10 (1MB size).
+
+
+
 
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/AaJgSZKl)

@@ -10,4 +10,13 @@
 int strcmp(const char*, const char*);
 
 
+/**
+ * Converts a string to an integer
+ * 
+ * @param str The string to convert
+ * @return The converted integer value
+ * @ref Based on https://www.geeksforgeeks.org/c-atoi-function/
+ */
+int atoi(const char* str);
+
 #endif

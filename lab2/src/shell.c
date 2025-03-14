@@ -5,6 +5,7 @@
 #include "mailbox.h"
 #include "reboot.h"
 #include "cpio.h"
+#include "malloc.h"
 
 // Declaration of command
 static int cmd_help(int argc, char* argv[]);
@@ -13,16 +14,20 @@ static int cmd_reboot(int argc, char* argv[]);
 static int cmd_mailbox(int argc, char* argv[]);
 static int cmd_ls(int argc, char* argv[]);
 static int cmd_cat(int argc, char* argv[]);
+static int cmd_memAlloc(int argc, char* argv[]);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
-    {"help",    "\t: print this help menu\r\n",             cmd_help},
-    {"hello",   "\t: print Hello World !\r\n",              cmd_hello},
-    {"reboot",  "\t: reboot the device\r\n",                cmd_reboot},
-    {"mailbox", "\t: show the mailbox info\r\n",            cmd_mailbox},
-    {"ls",      "\t: list information about the FILEs\r\n", cmd_ls},
-    {"cat",     "\t: view the content of the file \r\n"
-                "\t  Usage: cat <filename> \r\n",           cmd_cat},
+    {"help",    "\t\t: print this help menu\r\n",             cmd_help},
+    {"hello",   "\t\t: print Hello World !\r\n",              cmd_hello},
+    {"reboot",  "\t\t: reboot the device\r\n",                cmd_reboot},
+    {"mailbox", "\t\t: show the mailbox info\r\n",            cmd_mailbox},
+    {"ls",      "\t\t: list information about the FILEs\r\n", cmd_ls},
+    {"cat",     "\t\t: view the content of the file \r\n"
+                "\t\t  Usage: cat <filename> \r\n",           cmd_cat},
+    {"memAlloc","\t: a simple allocator, will returns "
+                "a pointer points to a continuous "
+                "space for requested size\r\n",               cmd_memAlloc},
     {NULL, NULL, NULL}
 };
 
@@ -68,6 +73,30 @@ static int cmd_cat(int argc, char* argv[]){
     }
     
     cpio_cat(initranfs_addr, argv[1]);
+    return 0;
+}
+
+static int cmd_memAlloc(int argc, char* argv[]){
+    if(argc != 2){
+        muart_puts("Usage: memAlloc <size>\r\n");
+        return -1;
+    }
+
+    // Convert the size argument from a string to an integer
+    int size = atoi(argv[1]);
+
+    // Allocate the memory and store the start address in `mem`
+    void* mem = simple_alloc(size);
+
+    // Check the results
+    if(mem){
+        muart_puts("Allocated memory at: ");
+        muart_send_hex((unsigned int)mem);
+        muart_puts("\r\n");
+    }
+    else{
+        muart_puts("Failed to allocate memory\r\n");
+    }
     return 0;
 }
 

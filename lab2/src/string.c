@@ -16,3 +16,12 @@ int strcmp(const char* str1 , const char* str2){
     
     return c1 - c2;
 }
+
+int atoi(const char* str){
+    int result = 0;
+    while(*str){
+        result = 10*result + (*str - '0');
+        str++;
+    }
+    return result;
+}

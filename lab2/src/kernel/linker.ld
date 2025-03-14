@@ -12,6 +12,12 @@ SECTIONS
     .bss (NOLOAD) : { *(.bss) }
     bss_end = .;
 
+    /* Initialize the address and the size of heap */
+    . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */ 
+    heap_begin = .;
+    . = . + 0x100000;   /* Allocate 1MB to heap (pre-allocated memory pool) */
+    heap_end = .;
+
     /* Initialize the address and size of stack */
     . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */
     . = . + 0x400000; /* Allocate 4MB to stack */
