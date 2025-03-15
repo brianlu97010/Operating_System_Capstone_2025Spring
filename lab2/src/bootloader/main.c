@@ -7,7 +7,10 @@ void bootloader_main(){
     muart_init();
     
     muart_puts("Hello from the bootloader ! \r\n");
-    
+    muart_puts("bootloader main function is relocated at ");
+    muart_send_hex((unsigned int)bootloader_main);
+    muart_puts("\r\n");
+
     // Receive header first
     header_t header;
     
