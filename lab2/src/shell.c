@@ -6,6 +6,7 @@
 #include "reboot.h"
 #include "cpio.h"
 #include "malloc.h"
+#include "types.h"
 
 // Declaration of command
 static int cmd_help(int argc, char* argv[]);
@@ -60,13 +61,13 @@ static int cmd_mailbox(int argc, char* argv[]){
 }
 
 static int cmd_ls(int argc, char* argv[]){
-    void* initranfs_addr = (void*)INITRANFS_ADDR;
+    void* initranfs_addr = get_cpio_addr();
     cpio_ls(initranfs_addr);
     return 0;
 }
 
 static int cmd_cat(int argc, char* argv[]){
-    void* initranfs_addr = (void*)INITRANFS_ADDR;
+    void* initranfs_addr = get_cpio_addr();
     if(argc < 2){
         muart_puts("Usage: cat <filename>\r\n");
         return -1;

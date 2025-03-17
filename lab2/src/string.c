@@ -1,5 +1,6 @@
 #include "string.h"
 #include "muart.h"
+#include "types.h"
 
 int strcmp(const char* str1 , const char* str2){
     const unsigned char* u_str1 = (const unsigned char*)str1;
@@ -24,4 +25,14 @@ int atoi(const char* str){
         str++;
     }
     return result;
+}
+
+size_t strlen(const char* str) {
+    const char* s = str;
+    
+    while(*s) {
+        s++;
+    }
+    
+    return s - str;
 }

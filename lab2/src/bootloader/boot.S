@@ -2,6 +2,9 @@
 
 .global _start
 _start:
+    // Preserve the boot args (x0 contains the physical address of device tree blob (.dtb) in system RAM)
+    mov x21, x0
+
     // Find the primary core (CPU 0)
     mrs x0, mpidr_el1
     and x0, x0, #0xFF
@@ -62,8 +65,11 @@ relocation:
     // Initialize the stack pointer to 4MB, using the sybmol defined in linker script
     ldr x3, =stack_top
     mov sp, x3
+    
+    // Procedure call will pass x0 ~ x7 as parameters
+    mov x0, x21
 
-    // Jump to bootloader main function
+    // Jump to bootloader main function with parameters x0
     bl bootloader_main
     b busy_loop
 

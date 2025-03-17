@@ -2,8 +2,8 @@
 #include "muart.h"
 #include "utils.h"
 
-void bootloader_main(){
-// Initialize mini UART
+void bootloader_main(void* fdt_addr){
+    // Initialize mini UART
     muart_init();
     
     muart_puts("Hello from the bootloader ! \r\n");
@@ -54,7 +54,7 @@ void bootloader_main(){
     muart_send_hex(KERNEL_LOAD_ADDR);
     muart_puts("...\r\n");
 
-    // Jump to kernel using function pointer
-    void (*kernel_entry)(void) = (void (*)(void))KERNEL_LOAD_ADDR;
-    kernel_entry();
+    // Jump to kernel using function pointer, pass the fdt_addr as the parameter (will be stored in x0 reg in kernel/boot.S)
+    void (*kernel_entry)(void*) = (void (*)(void*))KERNEL_LOAD_ADDR;
+    kernel_entry(fdt_addr);
 }

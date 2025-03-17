@@ -261,7 +261,56 @@ The bootloader's main function was originally at address `0x800e8` and is now ex
 
 
 ## Advanced Exercise 2:
+### Deploying on Raspberry Pi 3B+
+1. **Configure the SD Card**:
+   - Move [bcm2710-rpi-3-b-plus.dtb](https://github.com/raspberrypi/firmware/raw/master/boot/bcm2710-rpi-3-b-plus.dtb) into SD card.
+   - Copy the CPIO archive `initramfs.cpio` to the boot partition of your SD card
+   - Add this line to `config.txt` to specify the loading address and the ramfs filename:
+     ```
+     initramfs initramfs.cpio
+     ```
 
+2. **Compile the Code**:
+   ```bash
+   make clean && make raspi
+   ```
+
+3. **Transfer the kerenl to Raspi through UART bootloader**
+   ```bash
+   python3 send_kernel.py kernel8.img /dev/ttyUSB0 
+   ```
+
+### Emulating with QEMU
+1. **Compile the Code**:
+   ```bash
+   make qemu
+   ```
+
+2. **Run the Emulation**:
+   ```bash
+   qemu-system-aarch64 -machine raspi3b -kernel kernel8.img -serial null -serial stdio -dtb bcm2710-rpi-3-b-plus.dtb -initrd initramfs.cpio
+   ```
+
+### Shell Commands
+
+Once the system is running, you can use these commands to interact with the CPIO archive:
+
+- `ls` - List all files in the CPIO archive
+- `cat <filename>` - View the content of a specified file
+
+Example usage:
+```
+# ls
+.
+file2.txt
+file1
+
+# cat file1
+File name: file1
+This is file1.
+```
+### Demo on Raspi
+![demo2](assets/advanced2.png)
 
 ## Due Date
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/AaJgSZKl)

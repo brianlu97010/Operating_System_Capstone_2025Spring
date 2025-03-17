@@ -10,4 +10,5 @@ kernel=bootloader.img
 arm_64bit=1
 
 # Specifies both the ramfs filename and the memory address to which to load it.
-initramfs initramfs.cpio 0x20000000
+# initramfs initramfs.cpio 0x20000000
+initramfs initramfs.cpio

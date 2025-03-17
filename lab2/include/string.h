@@ -1,6 +1,8 @@
 #ifndef _STRING_H
 #define _STRING_H
 
+#include "types.h"
+
 /**
  * Compares two C strings.
  * 
@@ -18,5 +20,13 @@ int strcmp(const char*, const char*);
  * @ref Based on https://www.geeksforgeeks.org/c-atoi-function/
  */
 int atoi(const char* str);
+
+/**
+ * Calculates the length of a string.
+ * 
+ * @param str The string to measure
+ * @return The number of characters in the string, not including the null terminator
+ */
+size_t strlen(const char* str);
 
 #endif

@@ -2,7 +2,17 @@
 #include "muart.h"
 #include "string.h"
 
-unsigned int cpio_padded_size(unsigned int size) {
+static unsigned int initramfs_address = 0x20000000;
+
+void set_initramfs_address(unsigned int addr) {
+    initramfs_address = addr;
+}
+
+const void* get_cpio_addr(void) {
+    return (const void*)initramfs_address;
+}
+
+inline unsigned int cpio_padded_size(unsigned int size) {
     // If the value is the multiple of 4, then its last 2 bits must be 0
     // Add 3 to ensure round "up" tto the next multiple of 4 
     return (size + 3) & ~3;  
