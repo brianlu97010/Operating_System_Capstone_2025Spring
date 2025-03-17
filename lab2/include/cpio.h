@@ -4,12 +4,6 @@
 #define CPIO_MAGIC              "070701"
 #define CPIO_TRAILER            "TRAILER!!!"
 
-#ifdef RASPI
-#define INITRANFS_ADDR          0x20000000 // the memory address where the cpio file load into, defined in config.txt
-#else 
-#define INITRANFS_ADDR          0x8000000  // QEMU loads the cpio archive file to 0x8000000 by default.
-#endif
-
 typedef struct{
     char    c_magic[6];     // string "070701"
     char    c_ino[8];       // The inode numbers from the disk.
@@ -27,17 +21,23 @@ typedef struct{
     char    c_check[8]; 
 } cpio_newc_header;
 
-// Round up to a multiple of 4
-// Will be used to align filedata size to 4 bytes
+/* Round up to a multiple of 4
+ * Will be used to align filedata size to 4 bytes */
 unsigned int cpio_padded_size(unsigned int);
 
-// Convert ASCII string (stored in hex format) to unsigned int (The New ASCII Format uses 8-byte hexadecimal fields)
+/* Convert ASCII string (stored in hex format) to unsigned int (The New ASCII Format uses 8-byte hexadecimal fields) */
 unsigned int cpio_hex_to_int(const char*, unsigned int);
 
-// List all files in the CPIO archive
+/* List all files in the CPIO archive */
 void cpio_ls(const void*);
 
-// Print the file data in the CPIO archive
+/* Print the file data in the CPIO archive */
 void cpio_cat(const void*, const char*);
+
+/* The API for other modules set the initramfs_address */
+void set_initramfs_address(unsigned int addr);
+
+/* The API for other modules get the initramfs_address */
+const void* get_cpio_addr(void);
 
 #endif

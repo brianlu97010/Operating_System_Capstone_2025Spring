@@ -1,5 +1,5 @@
 #include "malloc.h"
-#include "utils.h"
+#include "types.h"
 
 // External symbols defined in the linker script
 extern char heap_begin;

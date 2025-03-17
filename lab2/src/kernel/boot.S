@@ -2,6 +2,9 @@
 
 .global _start
 _start:
+    // Save the fdt address passed in x0 before it gets overwritten
+    mov x21, x0
+
     // Find the primary core (CPU 0)
     mrs x0, mpidr_el1
     and x0, x0, #0xFF
@@ -18,7 +21,10 @@ primary_core:
     ldr x3, =stack_top
     mov sp, x3
 
-    // Jump to main function
+    // Procedure call will pass x0 ~ x7 as parameters
+    mov x0, x21
+
+    // Jump to main function with parameters x0
     bl main
     b busy_loop
 

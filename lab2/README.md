@@ -207,6 +207,110 @@ Using `nm -n src/kernel/kernel8.elf`, we can observe the memory layout:
 This confirms our heap is positioned correctly in memory, starting at address 0x81a10 and ending at 0x181a10 (1MB size).
 
 
+## Advanced Exercise 1: Bootloader Self Relocation
+### Testing Self-Relocation
+1. Remove or comment out the `kernel_address=0x60000` line in the `config.txt` file
+2. Build and deploy the bootloader:
+   ```bash
+   make clean && make raspi
+   ```
+3. Copy `bootloader.img` to the SD card
+4. Boot the Raspberry Pi and check the output to verify relocation was successful
+5. Send the kernel to the relocated bootloader
+
+### Demo
+When the bootloader successfully relocates itself, you'll see output confirming the new address:
+```
+bootloader main function is relocated at 0x000600e8
+
+Kernel transmit complete. Validating checksum...
+Checksum valid. Jumping to kernel at 0x00080000
+Welcome to OSC simple shell !!!
+Type help to see all available commands 
+# 
+```
+You can confirm this matches our expectations by examining the original and relocated addresses:
+```
+$ aarch64-linux-gnu-objdump -d src/bootloader/bootloader.elf
+
+Disassembly of section .text.boot:
+
+...
+000000000008004c <relocation>:
+   8004c:       58000421        ldr     x1, 800d0 <setmemtozero+0x3c>
+   80050:       58000442        ldr     x2, 800d8 <setmemtozero+0x44>
+   80054:       58000463        ldr     x3, 800e0 <setmemtozero+0x4c>
+...
 
 
+Disassembly of section .text:
+
+00000000000800e8 <bootloader_main>:
+   800e8:       a9ba7bfd        stp     x29, x30, [sp, #-96]!
+   800ec:       910003fd        mov     x29, sp
+   800f0:       f9000bf3        str     x19, [sp, #16]
+   800f4:       940000d1        bl      80438 <muart_init>
+   800f8:       90000000        adrp    x0, 80000 <_start>
+....
+```
+The bootloader's main function was originally at address `0x800e8` and is now executing at `0x600e8`, demonstrating that:
+
+* The bootloader was successfully relocated from `0x80000` to `0x60000`
+* All code references were properly adjusted during relocation
+* The relocated bootloader can successfully load the kernel to `0x80000`
+
+
+## Advanced Exercise 2:
+### Deploying on Raspberry Pi 3B+
+1. **Configure the SD Card**:
+   - Move [bcm2710-rpi-3-b-plus.dtb](https://github.com/raspberrypi/firmware/raw/master/boot/bcm2710-rpi-3-b-plus.dtb) into SD card.
+   - Copy the CPIO archive `initramfs.cpio` to the boot partition of your SD card
+   - Add this line to `config.txt` to specify the loading address and the ramfs filename:
+     ```
+     initramfs initramfs.cpio
+     ```
+
+2. **Compile the Code**:
+   ```bash
+   make clean && make raspi
+   ```
+
+3. **Transfer the kerenl to Raspi through UART bootloader**
+   ```bash
+   python3 send_kernel.py kernel8.img /dev/ttyUSB0 
+   ```
+
+### Emulating with QEMU
+1. **Compile the Code**:
+   ```bash
+   make qemu
+   ```
+
+2. **Run the Emulation**:
+   ```bash
+   qemu-system-aarch64 -machine raspi3b -kernel kernel8.img -serial null -serial stdio -dtb bcm2710-rpi-3-b-plus.dtb -initrd initramfs.cpio
+   ```
+
+### Shell Commands
+
+Once the system is running, you can use these commands to interact with the CPIO archive:
+
+- `ls` - List all files in the CPIO archive
+- `cat <filename>` - View the content of a specified file
+
+Example usage:
+```
+# ls
+.
+file2.txt
+file1
+
+# cat file1
+File name: file1
+This is file1.
+```
+### Demo on Raspi
+![demo2](assets/advanced2.png)
+
+## Due Date
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/AaJgSZKl)
