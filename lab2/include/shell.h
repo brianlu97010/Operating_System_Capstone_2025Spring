@@ -5,7 +5,7 @@
 typedef int (*cmdHandler_t)(int argc, char* argv[]);
 
 /* Define the structure for command table */
-typedef struct {
+typedef struct cmd_t{
     const char* name;
     const char* description;
     cmdHandler_t handler;

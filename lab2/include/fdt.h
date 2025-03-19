@@ -8,7 +8,7 @@
 #define FDT_NOP          0x4            // No Operation
 #define FDT_END          0x9            // marks the end of the structure block
 
-typedef struct{
+typedef struct fdt_header{
     unsigned int magic;                 // the value 0xd00dfeed (big-endian)
     unsigned int totalsize;             // the total size in bytes of the devicetree data structure
     unsigned int off_dt_struct;         // the offset in bytes of the structure block from the beginning of the header.
@@ -21,7 +21,7 @@ typedef struct{
     unsigned int size_dt_struct;        // the length in bytes of the structure block section of the devicetree blob.
 }fdt_header;
 
-typedef struct{
+typedef struct initramfs_context_t{
     int found;
     unsigned int address;
 }initramfs_context_t;

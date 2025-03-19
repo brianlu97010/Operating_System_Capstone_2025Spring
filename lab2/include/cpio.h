@@ -4,7 +4,7 @@
 #define CPIO_MAGIC              "070701"
 #define CPIO_TRAILER            "TRAILER!!!"
 
-typedef struct{
+typedef struct cpio_newc_header{
     char    c_magic[6];     // string "070701"
     char    c_ino[8];       // The inode numbers from the disk.
     char    c_mode[8];      // The mode specifies both the regular permissions and the file type.
