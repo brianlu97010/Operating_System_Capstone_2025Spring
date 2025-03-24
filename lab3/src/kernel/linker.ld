@@ -23,5 +23,10 @@ SECTIONS
     . = . + 0x400000; /* Allocate 4MB to stack */
     stack_top = .;   /* Stack grows from up to down */
 
+    /* Stack for EL0 user programs */
+    . = ALIGN(0x8);
+    . = . + 0x100000; /* Allocate 1MB to EL0 stack */
+    el0_stack_top = .;
+
     _end = .;
 }

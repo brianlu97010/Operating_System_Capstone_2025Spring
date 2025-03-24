@@ -27,7 +27,7 @@ def send_kernel(kernel_path, serial_port, baud_rate = 115200):
     
     try:
         # Write to the serial port
-        with serial.Serial(serial_port, baud_rate, write_timeout=1) as s:
+        with serial.Serial(serial_port, baud_rate, write_timeout=None) as s:
             print("Sending header...")
             bytes_written = s.write(header)
             time.sleep(1)       # 不加傳不過去 ?

@@ -16,6 +16,7 @@ static int cmd_mailbox(int argc, char* argv[]);
 static int cmd_ls(int argc, char* argv[]);
 static int cmd_cat(int argc, char* argv[]);
 static int cmd_memAlloc(int argc, char* argv[]);
+static int cmd_exec_prog(int argc, char* argv[]);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
@@ -29,6 +30,7 @@ static const cmd_t cmdTable[] = {
     {"memAlloc","\t: a simple allocator, will returns "
                 "a pointer points to a continuous "
                 "space for requested size\r\n",               cmd_memAlloc},
+    {"exec", "\t\t: execute a user program at EL0\r\n\t\t  Usage: exec <filename>\r\n", cmd_exec_prog},
     {NULL, NULL, NULL}
 };
 
@@ -98,6 +100,20 @@ static int cmd_memAlloc(int argc, char* argv[]){
     else{
         muart_puts("Failed to allocate memory\r\n");
     }
+    return 0;
+}
+
+static int cmd_exec_prog(int argc, char* argv[]){
+    if(argc < 2){
+        muart_puts("Usage: exec <filename>\r\n");
+        return -1;
+    }
+    
+    // Get the initramfs address
+    void* initramfs_addr = get_cpio_addr();
+    
+    // Execute the user program from the initramfs
+    cpio_exec(initramfs_addr, argv[1]);
     return 0;
 }
 

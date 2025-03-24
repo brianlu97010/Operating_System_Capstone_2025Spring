@@ -10,7 +10,10 @@ ASMFLAGS = -Iinclude
 # Common
 SRCDIR = src/
 CFILES = $(wildcard $(SRCDIR)*.c)
-OBJFILES = $(CFILES:.c=.o)
+ASMFILES = $(wildcard $(SRCDIR)*.S)
+COBJFILES = $(CFILES:.c=.c.o)
+ASMOBJFILES = $(ASMFILES:.S=.S.o)
+OBJFILES = $(COBJFILES) $(ASMOBJFILES)
 
 # Bootloader
 BOOT_SRCDIR = src/bootloader/
@@ -19,16 +22,18 @@ BOOT_CFILES = $(wildcard $(BOOT_SRCDIR)*.c)
 BOOT_CFILES += src/muart.c
 BOOT_CFILES += src/utils.c
 BOOT_ASMFILES = $(wildcard $(BOOT_SRCDIR)*.S)
-BOOT_OBJFILES = $(BOOT_CFILES:.c=.o)
-BOOT_OBJFILES += $(BOOT_ASMFILES:.S=.o)
+BOOT_OBJFILES = $(BOOT_CFILES:.c=.c.o)
+BOOT_OBJFILES += $(BOOT_ASMFILES:.S=.S.o)
 
 # Kernel
 KERNEL_SRCDIR = src/kernel/
 KERNEL_CFILES = $(wildcard $(KERNEL_SRCDIR)*.c)
 KERNEL_CFILES += $(wildcard $(SRCDIR)*.c)
 KERNEL_ASMFILES = $(wildcard $(KERNEL_SRCDIR)*.S)
-KERNEL_OBJFILES = $(KERNEL_CFILES:.c=.o)
-KERNEL_OBJFILES += $(KERNEL_ASMFILES:.S=.o)
+KERNEL_ASMFILES += $(wildcard $(SRCDIR)*.S)
+KERNEL_COBJFILES = $(KERNEL_CFILES:.c=.c.o)
+KERNEL_ASMOBJFILES = $(KERNEL_ASMFILES:.S=.S.o)
+KERNEL_OBJFILES = $(KERNEL_COBJFILES) $(KERNEL_ASMOBJFILES)
 
 all: kernel8.img bootloader.img
 
@@ -51,24 +56,24 @@ raspi:
 	$(MAKE) PLATFORM=raspi
 
 # Common
-$(SRCDIR)%.o: $(SRCDIR)%.c
+$(SRCDIR)%.c.o: $(SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(SRCDIR)%.o: $(SRCDIR)%.S
+$(SRCDIR)%.S.o: $(SRCDIR)%.S
 	$(CC) $(ASMFLAGS) -c $< -o $@
 
 # Bootloader
-$(BOOT_SRCDIR)%.o: $(BOOT_SRCDIR)%.c
+$(BOOT_SRCDIR)%.c.o: $(BOOT_SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BOOT_SRCDIR)%.o: $(BOOT_SRCDIR)%.S
+$(BOOT_SRCDIR)%.S.o: $(BOOT_SRCDIR)%.S
 	$(CC) $(ASMFLAGS) -c $< -o $@
 
 # Kernel
-$(KERNEL_SRCDIR)%.o: $(KERNEL_SRCDIR)%.c
+$(KERNEL_SRCDIR)%.c.o: $(KERNEL_SRCDIR)%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(KERNEL_SRCDIR)%.o: $(KERNEL_SRCDIR)%.S
+$(KERNEL_SRCDIR)%.S.o: $(KERNEL_SRCDIR)%.S
 	$(CC) $(ASMFLAGS) -c $< -o $@
 
 

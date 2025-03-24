@@ -2,12 +2,14 @@
 #include "shell.h"
 #include "fdt.h"
 #include "cpio.h"
+#include "exception.h"
 
 void main(void* fdt){
     // Initialize mini UART
     muart_init();
 
-    muart_puts("Kernel : flatten device tree address is at ");
+    // Print the dtb loading address
+    muart_puts("\r\nKernel : flatten device tree address is at ");
     muart_send_hex(((unsigned int)fdt));
     muart_puts("\r\n");
 
@@ -19,6 +21,9 @@ void main(void* fdt){
 
     // Update the initramfs address in CPIO module
     set_initramfs_address(initramfs_addr);
+
+    // Initialize the vector table
+    exception_init();
 
     // Start Simple Shell
     shell();

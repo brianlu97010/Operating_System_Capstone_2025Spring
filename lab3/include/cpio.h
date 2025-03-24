@@ -34,6 +34,8 @@ void cpio_ls(const void*);
 /* Print the file data in the CPIO archive */
 void cpio_cat(const void*, const char*);
 
+void cpio_exec(const void* cpio_file_addr, const char* file_name);
+
 /* The API for other modules set the initramfs_address */
 void set_initramfs_address(unsigned int addr);
 

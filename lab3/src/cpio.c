@@ -1,6 +1,7 @@
 #include "cpio.h"
 #include "muart.h"
 #include "string.h"
+#include "exception.h"
 
 static unsigned int initramfs_address = 0x20000000;
 
@@ -109,5 +110,61 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
     muart_puts("File not found: ");
     muart_puts(file_name);
     muart_puts("\r\n");
+    return;
+}
+
+void cpio_exec(const void* cpio_file_addr, const char* file_name){
+    const char* current_addr = (const char*)cpio_file_addr;
+    cpio_newc_header* header;
+    const char* file_data;
+    void* program_start_addr = NULL;
+
+    while(1){
+        header = (cpio_newc_header*)current_addr; 
+
+        // Get the pathname size from the header and convert it to unsigned int
+        unsigned int pathname_size = cpio_hex_to_int(header->c_namesize, 8);
+
+        // Get the filedata size from the header and convert it to unsigned int
+        unsigned int filedata_size = cpio_hex_to_int(header->c_filesize, 8);
+
+        // Get the pathname which is followed by the header (the total size of header is sizeof(cpio_newc_header) bytes)
+        const char *pathname = current_addr + sizeof(cpio_newc_header);
+
+        // Check if reached the trailer
+        if( strcmp(pathname, CPIO_TRAILER) == 0 ){
+            break;
+        }
+        
+        // Store the file information
+        if( strcmp(file_name, pathname) == 0 ){
+            // Calculate the start address where file data starts
+            program_start_addr = (void*)(pathname + pathname_size);
+            break;
+        }
+
+        // Move to the next entry
+        current_addr = current_addr + sizeof(cpio_newc_header) + pathname_size + cpio_padded_size(filedata_size);
+    }
+
+    // Check if found the file
+    if(program_start_addr == NULL){
+        muart_puts("Error: File not found: ");
+        muart_puts(file_name);
+        muart_puts("\r\n");
+        return;
+    }
+    
+    // Print the file information if find
+    muart_puts("Executing program: ");
+    muart_puts(file_name);
+    muart_puts("\r\n");
+    
+    muart_puts("Program address: 0x");
+    muart_send_hex((unsigned int)program_start_addr);
+    muart_puts("\r\n");
+    
+    // Switch to EL0 and executre the user program
+    exec_user_program(program_start_addr);
     return;
 }

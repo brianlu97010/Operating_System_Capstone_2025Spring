@@ -12,6 +12,9 @@ _start:
     b busy_loop // other cores do busy loop
 
 primary_core:
+    // Switch from EL2 to EL1
+    bl from_el2_to_el1
+
     // Initialize BSS segment 
     adr x1, bss_begin
     adr x2, bss_end
@@ -38,3 +41,18 @@ setmemtozero:
     cmp x2, x1
     bgt setmemtozero
     ret
+
+// Rpi3’s CPU runs in EL2 after being booted by default, switch to EL1 at the beginning
+from_el2_to_el1:
+    // When exception level taken to EL1, the execution state is determined by HCR_EL2.RW
+    mov x0, #1<<31      // set RW bit to 1 (64 bit Execution state)
+    msr hcr_el2, x0     // write the value into hcr_el2
+
+    // Set EL1h with interrupt disabled
+    mov x0, #0x3c5      // 0x3c5 = 001111000101, SPsel(Bits[0]) = 1: Use the stack pointer of EL1; 
+                        //                       CurrentEL(Bits[3:2]) = 01: Current exception level is EL1; 
+                        //                       DAIF(Bits[9:6]) = 1111: Disable all interrupts
+    msr spsr_el2, x0    // Store the Process State into spsr registers
+    msr elr_el2, lr     // Store the address in link register to elr_el
+    eret                // Exception Return using the `ELR` and `SPSR` for the "current" Exception level i.e, EL2
+                        // When executed, the PE restores PSTATE from the `SPSR`, and branches to the address held in the `ELR` (primary_core+4)
