@@ -160,7 +160,7 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
     muart_puts(file_name);
     muart_puts("\r\n");
     
-    muart_puts("Program address: 0x");
+    muart_puts("Program address: ");
     muart_send_hex((unsigned int)program_start_addr);
     muart_puts("\r\n");
     
