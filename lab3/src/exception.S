@@ -1,9 +1,15 @@
 .global exec_user_program
 .global set_exception_vector_table
+.global enable_core_timer
 .global get_spsr_el1
 .global get_elr_el1
 .global get_esr_el1
 .global get_vbar_el1
+.global get_cntfrq_el0
+.global get_cntpct_el0
+
+#define CORE0_TIMER_IRQ_CTRL 0x40000040     // Core 0 Timers interrupt control
+#define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
 
 // save general registers to stack
 .macro save_all_reg 
@@ -48,62 +54,110 @@
 .endm
 
 
-// Exception vector table
+// Exception vector table, branch to the high-level exception handler
 .align 11               // Exception Vector table must be aligned to 0x800 i.e, 2^11 bytes
 exception_vector_table:
     // Exception from the current EL while using SP_EL0
-    b exception_handler // Synchronous
+    b sync_exception_handler // Synchronous
     .align 7            // Each entry in Vector Table has size 0x80 (128) bytes, so we need to align to 2^7 bytes in memory (byte-addressing)
-    b exception_handler // IRQ/vIRQ
+    b irq_handler       // IRQ/vIRQ
     .align 7
-    b exception_handler // FIQ/vFIQ
+    b other_exception_handler // FIQ/vFIQ
     .align 7
-    b exception_handler // SError/VSError
+    b other_exception_handler // SError/VSError
     .align 7
 
     // Exception from the current EL while using SP_ELx <- lab3
-    b exception_handler // Synchronous
+    b sync_exception_handler // Synchronous
     .align 7            
-    b exception_handler // IRQ/vIRQ
+    b irq_handler // IRQ/vIRQ
     .align 7
-    b exception_handler // FIQ/vFIQ
+    b other_exception_handler // FIQ/vFIQ
     .align 7
-    b exception_handler // SError/VSError
+    b other_exception_handler // SError/VSError
     .align 7
 
-    // Exception from a lower EL and at least one lower EL is AArch64 <- lab3
-    b exception_handler // Synchronous
+    // Exception from a lower EL and at least one lower EL is AArch64 <- lab3 (ex1, ex2)
+    b sync_exception_handler // Synchronous
     .align 7            
-    b exception_handler // IRQ/vIRQ
+    b irq_handler // IRQ/vIRQ
     .align 7
-    b exception_handler // FIQ/vFIQ
+    b other_exception_handler // FIQ/vFIQ
     .align 7
-    b exception_handler // SError/VSError
+    b other_exception_handler // SError/VSError
     .align 7
 
     // Exception from a lower EL and all lower ELs are AArch32
-    b exception_handler // Synchronous
+    b sync_exception_handler // Synchronous
     .align 7            
-    b exception_handler // IRQ/vIRQ
+    b irq_handler // IRQ/vIRQ
     .align 7
-    b exception_handler // FIQ/vFIQ
+    b other_exception_handler // FIQ/vFIQ
     .align 7
-    b exception_handler // SError/VSError
+    b other_exception_handler // SError/VSError
     .align 7
 
-// Set exception vector table
+// Set exception vector table, store the starting address in VBAR register
 set_exception_vector_table:
     adr x0, exception_vector_table
     msr vbar_el1, x0
     ret
 
+// Enable the core timer
+enable_core_timer:
+    // Set the cntp_ctl_el0.ENABLE bit to 1 i.e, Timer enabled
+    mov x0, 1
+    msr cntp_ctl_el0, x0
 
-// high-level exception handler
-exception_handler:
+    // Set expired time for 2 sec, the timer interrupt asserted when CNTP_CVAL_EL0 >= CNTPCT_EL0
+    mrs x0, cntfrq_el0      // Read the frequency of the system counter
+    lsl x0, x0, #1          // Multiply by 2 (shift left by 1 bit)
+    msr cntp_tval_el0, x0   // Write the ticks to cntp_tval_el0 that means CNTP_CVAL_EL0 is set to CNTPCT_EL0 + 2*system frequency
+
+    // Enabled the nCNTPNSIRQ (Physical Timer Non-Secure state IRQ) by setting the bit[1]
+    mov x0, 2
+    ldr x1, =CORE0_TIMER_IRQ_CTRL
+    str w0, [x1]            // 因為 Core 0 Timers interrupt control 這個 register 是 32-bit，因此用 w0 寫入
+    ret
+
+
+
+// high-level handler of Synchronous Exception 
+// store the registers before handling exception and check the exception type then branch to specific exception handler
+sync_exception_handler:
     save_all_reg                // Save the registers before handling exception
-    bl exception_entry          // branch to specific exception handler
+    bl svc_handler
     load_all_reg                // Restore the registers after handling exception
-    eret                        // exception return
+    eret
+
+// high-level handler of IRQ
+// store the registers before handling interrupt and check the IRQ type then branch to specific IRQ handler
+irq_handler:
+    save_all_reg                // Save the registers before handling exception
+
+    // Check if it's a CNTPNSIRQ interrupt
+    ldr x1, =CORE0_IRQ_SRC
+    ldr w0, [x1]                // Load the register value
+    and w0, w0, #2              // Check bit 1 (bit 1 stands for CNTPNSIRQ interrupt)
+    cbnz w0, handle_timer       // If bit 1 is set, branch to timer handler, the label will branch to timer-specific handler
+
+    // If reach here, it's an unexpected IRQ
+    bl unexpected_irq_handler
+    b irq_exit
+
+handle_timer:
+    bl timer_irq_handler
+    b irq_exit
+    
+irq_exit:
+    load_all_reg                // Restore the registers after handling exception
+    eret
+
+other_exception_handler:
+    save_all_reg
+    bl unexpected_irq_handler
+    load_all_reg                // Restore the registers after handling exception
+    eret
 
 
 // System register access functions
@@ -123,7 +177,16 @@ get_vbar_el1:
     mrs x0, vbar_el1
     ret
 
+get_cntfrq_el0:
+    mrs x0, cntfrq_el0
+    ret
 
+get_cntpct_el0:
+    mrs x0, cntpct_el0
+    ret
+
+
+/*
 // Switch to EL0 and execute the user program at EL0
 // x0 = program address
 exec_user_program:
@@ -138,6 +201,27 @@ exec_user_program:
     mov x0, #0x3c0      // 0x3c0 = 001111000000, SPsel(Bits[0]) = 0: Use the SP_EL0 
                         //                       CurrentEL(Bits[3:2]) = 00: Current exception level is EL0; 
                         //                       DAIF(Bits[9:6]) = 1111: Disable all interrupts
+    msr spsr_el1, x0    // Store the Process State into spsr registers
+    msr elr_el1, x19    // Store the start address of user program to elr_el
+    eret                // Exception Return using the `ELR` and `SPSR` for the "current" Exception level i.e, EL1
+                        // When executed, the PE restores PSTATE from the `SPSR`, and branches to the address held in the `ELR` (start address of user program)
+*/
+
+
+// Switch to EL0 and execute the user program at EL0
+// x0 = program address
+exec_user_program:
+    // Save program address in the callee saved registers
+    mov x19, x0
+    
+    // Set up stack for user program
+    ldr x1, =el0_stack_top // user_stack_top declared in linker script
+    msr sp_el0, x1
+    
+    // Set EL0t (using SP_EL0) with interrupt enabled
+    mov x0, 0           // SPsel(Bits[0]) = 0: Use the SP_EL0 
+                        // CurrentEL(Bits[3:2]) = 00: Current exception level is EL0; 
+                        // DAIF(Bits[9:6]) = 0000: Enables all interrupts
     msr spsr_el1, x0    // Store the Process State into spsr registers
     msr elr_el1, x19    // Store the start address of user program to elr_el
     eret                // Exception Return using the `ELR` and `SPSR` for the "current" Exception level i.e, EL1
