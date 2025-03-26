@@ -2,6 +2,12 @@
 #include "exception.h"
 
 void exception_init(){
+    // Get current EL
+    unsigned long el = get_current_el();
+    muart_puts("Current Exception Level : EL ");
+    muart_send_dec(el);
+    muart_puts("\r\n");
+
     // Write the vector table base address to VBR_EL1
     set_exception_vector_table();
     muart_puts("Exception handling initialized successful !\r\n");

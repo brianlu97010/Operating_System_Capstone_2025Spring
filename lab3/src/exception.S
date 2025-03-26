@@ -7,6 +7,7 @@
 .global get_vbar_el1
 .global get_cntfrq_el0
 .global get_cntpct_el0
+.global get_current_el
 
 #define CORE0_TIMER_IRQ_CTRL 0x40000040     // Core 0 Timers interrupt control
 #define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
@@ -185,6 +186,10 @@ get_cntpct_el0:
     mrs x0, cntpct_el0
     ret
 
+get_current_el:
+    mrs x0, CurrentEL
+    lsr x0, x0, #2
+    ret
 
 /*
 // Switch to EL0 and execute the user program at EL0

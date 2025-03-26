@@ -30,6 +30,7 @@ unsigned long get_esr_el1(void);
 unsigned long get_vbar_el1(void);
 unsigned long get_cntfrq_el0(void);
 unsigned long get_cntpct_el0(void);
+unsigned long get_current_el(void);
 
 
 #endif
