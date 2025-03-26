@@ -1,5 +1,6 @@
 #include "muart.h"
 #include "exception.h"
+#include "utils.h"
 
 void exception_init(){
     // Get current EL
@@ -57,6 +58,27 @@ void svc_handler(){
         muart_puts("other cause \r\n");
     }
 }
+
+
+
+
+void irq_entry(void) {
+    // Check if it's a CNTPNSIRQ interrupt (timer interrupt)
+    unsigned int irq_status = regRead(CORE0_IRQ_SRC);
+    
+    // Check bit 1 (CNTPNSIRQ interrupt bit)
+    if (irq_status & 0x2) {
+        // It's a timer interrupt
+        timer_irq_handler();
+    } else {
+        // If we reach here, it's an unexpected IRQ
+        unexpected_irq_handler();
+    }
+
+    // NOTE: The return from exception (eret) and register restoration
+    // will be handled by assembly code after this function returns
+}
+
 
 // Handle timer interrupt
 void timer_irq_handler(void){

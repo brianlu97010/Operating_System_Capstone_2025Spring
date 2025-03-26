@@ -1,12 +1,18 @@
 #ifndef _EXCEPTION_H
 #define _EXCEPTION_H
 
+
+#define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
+
 /* --- C functions --- */
 /* The API to initialize the exception vector table and enable the core's timer interrupt*/
 void exception_init(void);
 
 /* The SVC-specific handler: print the system reg's content */ 
 void svc_handler(void);
+
+/* High-level IRQ handler, determines the interrupt source and calls the specific handler */
+void irq_entry(void); 
 
 /* The timer-specific handler : Print elapsed time since boot and reset timer */
 void timer_irq_handler(void);

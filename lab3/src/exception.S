@@ -10,7 +10,6 @@
 .global get_current_el
 
 #define CORE0_TIMER_IRQ_CTRL 0x40000040     // Core 0 Timers interrupt control
-#define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
 
 // save general registers to stack
 .macro save_all_reg 
@@ -56,46 +55,46 @@
 
 
 // Exception vector table, branch to the high-level exception handler
-.align 11               // Exception Vector table must be aligned to 0x800 i.e, 2^11 bytes
+.align 11                           // Exception Vector table must be aligned to 0x800 i.e, 2^11 bytes
 exception_vector_table:
     // Exception from the current EL while using SP_EL0
-    b sync_exception_handler // Synchronous
-    .align 7            // Each entry in Vector Table has size 0x80 (128) bytes, so we need to align to 2^7 bytes in memory (byte-addressing)
-    b irq_handler       // IRQ/vIRQ
+    b sync_exception_handler        // Synchronous
+    .align 7                        // Each entry in Vector Table has size 0x80 (128) bytes, so we need to align to 2^7 bytes in memory (byte-addressing)
+    b irq_handler                   // IRQ/vIRQ
     .align 7
-    b other_exception_handler // FIQ/vFIQ
+    b other_exception_handler       // FIQ/vFIQ
     .align 7
-    b other_exception_handler // SError/VSError
+    b other_exception_handler       // SError/VSError
     .align 7
 
     // Exception from the current EL while using SP_ELx <- lab3
-    b sync_exception_handler // Synchronous
+    b sync_exception_handler        // Synchronous
     .align 7            
-    b irq_handler // IRQ/vIRQ
+    b irq_handler                   // IRQ/vIRQ
     .align 7
-    b other_exception_handler // FIQ/vFIQ
+    b other_exception_handler       // FIQ/vFIQ
     .align 7
-    b other_exception_handler // SError/VSError
+    b other_exception_handler       // SError/VSError
     .align 7
 
     // Exception from a lower EL and at least one lower EL is AArch64 <- lab3 (ex1, ex2)
-    b sync_exception_handler // Synchronous
+    b sync_exception_handler        // Synchronous
     .align 7            
-    b irq_handler // IRQ/vIRQ
+    b irq_handler                   // IRQ/vIRQ
     .align 7
-    b other_exception_handler // FIQ/vFIQ
+    b other_exception_handler       // FIQ/vFIQ
     .align 7
-    b other_exception_handler // SError/VSError
+    b other_exception_handler       // SError/VSError
     .align 7
 
     // Exception from a lower EL and all lower ELs are AArch32
-    b sync_exception_handler // Synchronous
+    b sync_exception_handler        // Synchronous
     .align 7            
-    b irq_handler // IRQ/vIRQ
+    b irq_handler                   // IRQ/vIRQ
     .align 7
-    b other_exception_handler // FIQ/vFIQ
+    b other_exception_handler       // FIQ/vFIQ
     .align 7
-    b other_exception_handler // SError/VSError
+    b other_exception_handler       // SError/VSError
     .align 7
 
 // Set exception vector table, store the starting address in VBAR register
@@ -135,22 +134,7 @@ sync_exception_handler:
 // store the registers before handling interrupt and check the IRQ type then branch to specific IRQ handler
 irq_handler:
     save_all_reg                // Save the registers before handling exception
-
-    // Check if it's a CNTPNSIRQ interrupt
-    ldr x1, =CORE0_IRQ_SRC
-    ldr w0, [x1]                // Load the register value
-    and w0, w0, #2              // Check bit 1 (bit 1 stands for CNTPNSIRQ interrupt)
-    cbnz w0, handle_timer       // If bit 1 is set, branch to timer handler, the label will branch to timer-specific handler
-
-    // If reach here, it's an unexpected IRQ
-    bl unexpected_irq_handler
-    b irq_exit
-
-handle_timer:
-    bl timer_irq_handler
-    b irq_exit
-    
-irq_exit:
+    bl irq_entry                // branch to irq_entry in exception.c, determine the IRQ type
     load_all_reg                // Restore the registers after handling exception
     eret
 
