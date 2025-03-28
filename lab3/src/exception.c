@@ -2,6 +2,7 @@
 #include "exception.h"
 #include "utils.h"
 #include "registers.h"
+#include "timer.h"
 
 void exception_init(){
     // Get current EL
@@ -22,6 +23,7 @@ void exception_init(){
     // Enable the core timer and enable the timer interrupt of the first level interrupt controller
     enable_core_timer();
     muart_puts("Core timer initialized\r\n");
+    enable_core_timer_int();
     muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
 }
 

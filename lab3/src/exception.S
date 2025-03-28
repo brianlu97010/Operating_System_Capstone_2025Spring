@@ -1,6 +1,5 @@
 .global exec_user_program
 .global set_exception_vector_table
-.global enable_core_timer
 .global get_spsr_el1
 .global get_elr_el1
 .global get_esr_el1
@@ -9,7 +8,7 @@
 .global get_cntpct_el0
 .global get_current_el
 
-#define CORE0_TIMER_IRQ_CTRL 0x40000040     // Core 0 Timers interrupt control
+
 
 // save general registers to stack
 .macro save_all_reg 
@@ -102,25 +101,6 @@ set_exception_vector_table:
     adr x0, exception_vector_table
     msr vbar_el1, x0
     ret
-
-// Enable the core timer
-enable_core_timer:
-    // Set the cntp_ctl_el0.ENABLE bit to 1 i.e, Timer enabled
-    mov x0, 1
-    msr cntp_ctl_el0, x0
-
-    // Set expired time for 2 sec, the timer interrupt asserted when CNTP_CVAL_EL0 >= CNTPCT_EL0
-    mrs x0, cntfrq_el0      // Read the frequency of the system counter
-    lsl x0, x0, #1          // Multiply by 2 (shift left by 1 bit)
-    msr cntp_tval_el0, x0   // Write the ticks to cntp_tval_el0 that means CNTP_CVAL_EL0 is set to CNTPCT_EL0 + 2*system frequency
-
-    // Enabled the nCNTPNSIRQ (Physical Timer Non-Secure state IRQ) by setting the bit[1]
-    mov x0, 2
-    ldr x1, =CORE0_TIMER_IRQ_CTRL
-    str w0, [x1]            // 因為 Core 0 Timers interrupt control 這個 register 是 32-bit，因此用 w0 寫入
-    ret
-
-
 
 // high-level handler of Synchronous Exception 
 // store the registers before handling exception and check the exception type then branch to specific exception handler

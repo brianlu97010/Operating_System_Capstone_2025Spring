@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "types.h"
 #include "string.h"
+#include "timer.h"
 
 char muart_receive(){
     while ( !(regRead(AUX_MU_LSR_REG) & 1) ){
@@ -235,6 +236,9 @@ size_t async_uart_puts(const char* str) {
 
 // Example of using async UART for reading/writing data
 void async_uart_example(){
+    // Disable the timer interrupt for unexpected msg
+    disable_core_timer_int();
+
     // Initialize async UART
     async_uart_init();
     
@@ -284,7 +288,6 @@ void async_uart_example(){
                     
                     // Reset buffer
                     i = 0;
-                    break;
                 }
                 else buffer[i++] = c;  // Store into buffer
             }
@@ -298,4 +301,5 @@ void async_uart_example(){
     __asm__ volatile ("msr DAIFSet, 0xf");
     
     muart_puts("Exiting async UART example\r\n");
+    enable_core_timer_int();
 }

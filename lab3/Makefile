@@ -23,6 +23,7 @@ BOOT_CFILES += src/muart.c
 BOOT_CFILES += src/utils.c
 BOOT_CFILES += src/string.c
 BOOT_ASMFILES = $(wildcard $(BOOT_SRCDIR)*.S)
+BOOT_ASMFILES += src/timer.S
 BOOT_OBJFILES = $(BOOT_CFILES:.c=.c.o)
 BOOT_OBJFILES += $(BOOT_ASMFILES:.S=.S.o)
 

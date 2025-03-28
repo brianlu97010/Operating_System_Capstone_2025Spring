@@ -26,9 +26,6 @@ extern void exec_user_program(void* program_addr);
 /* Set exception vector table */
 extern void set_exception_vector_table(void);
 
-/* Enable the core timer and enable the timer interrupt of the first level interrupt controller */
-extern void enable_core_timer(void);
-
 /* System register access functions */
 extern unsigned long get_spsr_el1(void);
 extern unsigned long get_elr_el1(void);
