@@ -17,6 +17,7 @@ static int cmd_ls(int argc, char* argv[]);
 static int cmd_cat(int argc, char* argv[]);
 static int cmd_memAlloc(int argc, char* argv[]);
 static int cmd_exec_prog(int argc, char* argv[]);
+static int cmd_async_uart(int argc, char* argv[]);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
@@ -31,6 +32,7 @@ static const cmd_t cmdTable[] = {
                 "a pointer points to a continuous "
                 "space for requested size\r\n",               cmd_memAlloc},
     {"exec", "\t\t: execute a user program at EL0\r\n\t\t  Usage: exec <filename>\r\n", cmd_exec_prog},
+    {"auart", "\t\t: Example of using async UART for reading/writing data\r\n", cmd_async_uart},
     {NULL, NULL, NULL}
 };
 
@@ -114,6 +116,11 @@ static int cmd_exec_prog(int argc, char* argv[]){
     
     // Execute the user program from the initramfs
     cpio_exec(initramfs_addr, argv[1]);
+    return 0;
+}
+
+static int cmd_async_uart(int argc, char* argv[]){
+    async_uart_example();
     return 0;
 }
 

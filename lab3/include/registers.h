@@ -10,6 +10,7 @@
 #define GPPUDCLK0               (MMIO_BASE+0x00200098)
 
 /* Mini UART registers */ 
+#define AUXIRQ                  (MMIO_BASE+0x00215000)
 #define AUXENB                  (MMIO_BASE+0x00215004)
 #define AUX_MU_CNTL_REG         (MMIO_BASE+0x00215060)
 #define AUX_MU_IER_REG          (MMIO_BASE+0x00215044)
@@ -19,6 +20,11 @@
 #define AUX_MU_IIR_REG          (MMIO_BASE+0x00215048)
 #define AUX_MU_LSR_REG          (MMIO_BASE+0x00215054)
 #define AUX_MU_IO_REG           (MMIO_BASE+0x00215040)
+
+/* Interrupt registers */
+#define INTERRUPT_BASE          (MMIO_BASE+0x0000B000)
+#define IRQ_PEND1               (INTERRUPT_BASE+0x204)  // IRQ pending 1 register
+#define ENABLE_IRQS1            (INTERRUPT_BASE+0x210)  // Enable IRQs 1 register
 
 /* Mailbox registers */
 #define MAILBOX_BASE            (MMIO_BASE+0xB880)

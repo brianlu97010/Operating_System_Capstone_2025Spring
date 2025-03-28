@@ -1,6 +1,7 @@
 #include "muart.h"
 #include "exception.h"
 #include "utils.h"
+#include "registers.h"
 
 void exception_init(){
     // Get current EL
@@ -24,6 +25,9 @@ void exception_init(){
     muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
 }
 
+void unexpected_irq_handler(){
+    muart_puts("Unexpected IRQ \r\n");
+}
 
 void svc_handler(){
     // Call the assembly function to read the system register
@@ -59,24 +63,39 @@ void svc_handler(){
     }
 }
 
-
-
-
 void irq_entry(void) {
-    // Check if it's a CNTPNSIRQ interrupt (timer interrupt)
+    // Load the value of core 0 interrupt source
     unsigned int irq_status = regRead(CORE0_IRQ_SRC);
     
-    // Check bit 1 (CNTPNSIRQ interrupt bit)
-    if (irq_status & 0x2) {
-        // It's a timer interrupt
+    // Check if it's a timer interrupt (bit 1 stands for CNTPNSIRQ interrupt)
+    if (irq_status & 2){
+        // If bit 1 is set, branch to timer-specific handler
         timer_irq_handler();
-    } else {
+    }
+    // Check if it's a GPU IRQ signals (bit 8 stands for GPU interrupt)
+    else if ( irq_status & (1<<8) ){
+        // Check if it's an AUX interrupt (bit 29 in IRQ_PEND1 stands for AUX int is pending)
+        if ( regRead(IRQ_PEND1) & (1<<29) ){
+            // Check if it's the mini UART interrupt (bit 0 stands the mini UART has an interrupt pending)
+            if( regRead(AUXIRQ) & 1 ){ 
+                // branch to uart-specific IRQ handler
+                uart_irq_handler();
+            }
+            else{
+                // If we reach here, it's an unexpected IRQ
+                unexpected_irq_handler();         
+            }
+        }
+        else{
+            // If we reach here, it's an unexpected IRQ
+            unexpected_irq_handler(); 
+        }
+
+    }
+    else{
         // If we reach here, it's an unexpected IRQ
         unexpected_irq_handler();
     }
-
-    // NOTE: The return from exception (eret) and register restoration
-    // will be handled by assembly code after this function returns
 }
 
 
@@ -99,8 +118,4 @@ void timer_irq_handler(void){
         "msr cntp_tval_el0, x0"     // Set next expired time for 2 seconds
         ::: "x0"                    
     );
-}
-
-void unexpected_irq_handler(){
-    muart_puts("Unexpected IRQ \r\n");
 }

@@ -21,22 +21,22 @@ void timer_irq_handler(void);
 
 /* --- Assembly functions --- */
 /* Switch to EL0 and execute the user program at EL0 */
-void exec_user_program(void* program_addr);
+extern void exec_user_program(void* program_addr);
 
 /* Set exception vector table */
-void set_exception_vector_table(void);
+extern void set_exception_vector_table(void);
 
 /* Enable the core timer and enable the timer interrupt of the first level interrupt controller */
-void enable_core_timer(void);
+extern void enable_core_timer(void);
 
 /* System register access functions */
-unsigned long get_spsr_el1(void);
-unsigned long get_elr_el1(void);
-unsigned long get_esr_el1(void);
-unsigned long get_vbar_el1(void);
-unsigned long get_cntfrq_el0(void);
-unsigned long get_cntpct_el0(void);
-unsigned long get_current_el(void);
+extern unsigned long get_spsr_el1(void);
+extern unsigned long get_elr_el1(void);
+extern unsigned long get_esr_el1(void);
+extern unsigned long get_vbar_el1(void);
+extern unsigned long get_cntfrq_el0(void);
+extern unsigned long get_cntpct_el0(void);
+extern unsigned long get_current_el(void);
 
 
 #endif
