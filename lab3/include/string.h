@@ -29,4 +29,12 @@ int atoi(const char* str);
  */
 size_t strlen(const char* str);
 
+/**
+ * Copy a specified number of characters from one string to another.
+ * 
+ * @param dest: A pointer to the destination array where the content is to be copied; src: A pointer to the source string to be copied; n: The number of characters to be copied from the source string.
+ * @return A pointer to the destination string dest
+ */
+char* strncpy(char* dest, const char* src, size_t n);
+
 #endif
