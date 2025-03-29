@@ -99,25 +99,3 @@ void irq_entry(void) {
         unexpected_irq_handler();
     }
 }
-
-
-// Handle timer interrupt
-void timer_irq_handler(void){
-    // Get elapsed time since boot
-    unsigned long timer_freq = get_cntfrq_el0();
-    unsigned long timer_count = get_cntpct_el0();
-    unsigned long elapsed_seconds = timer_count / timer_freq;
-    
-    // Print elapsed time
-    muart_puts("Time since boot: ");
-    muart_send_dec(elapsed_seconds);
-    muart_puts(" seconds\r\n");
-    
-    // Reset timer for next interrupt
-    __asm__ volatile (
-        "mrs x0, cntfrq_el0\n\t"    // Get timer frequency
-        "lsl x0, x0, #1\n\t"        // Multiply by 2 (shift left by 1)
-        "msr cntp_tval_el0, x0"     // Set next expired time for 2 seconds
-        ::: "x0"                    
-    );
-}

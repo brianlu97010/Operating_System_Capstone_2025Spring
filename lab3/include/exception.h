@@ -14,9 +14,6 @@ void svc_handler(void);
 /* High-level IRQ handler, determines the interrupt source and calls the specific handler */
 void irq_entry(void); 
 
-/* The timer-specific handler : Print elapsed time since boot and reset timer */
-void timer_irq_handler(void);
-
 
 
 /* --- Assembly functions --- */
@@ -26,14 +23,17 @@ extern void exec_user_program(void* program_addr);
 /* Set exception vector table */
 extern void set_exception_vector_table(void);
 
+/* Enable IRQ in EL1 */
+extern void enable_irq_in_el1(void);
+
+/* Disable IRQ in EL1 */
+extern void disable_irq_in_el1(void);
+
 /* System register access functions */
 extern unsigned long get_spsr_el1(void);
 extern unsigned long get_elr_el1(void);
 extern unsigned long get_esr_el1(void);
 extern unsigned long get_vbar_el1(void);
-extern unsigned long get_cntfrq_el0(void);
-extern unsigned long get_cntpct_el0(void);
 extern unsigned long get_current_el(void);
-
 
 #endif

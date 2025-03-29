@@ -4,8 +4,6 @@
 .global get_elr_el1
 .global get_esr_el1
 .global get_vbar_el1
-.global get_cntfrq_el0
-.global get_cntpct_el0
 .global get_current_el
 
 
@@ -124,37 +122,6 @@ other_exception_handler:
     load_all_reg                // Restore the registers after handling exception
     eret
 
-
-// System register access functions
-get_spsr_el1:
-    mrs x0, spsr_el1
-    ret
-
-get_elr_el1:
-    mrs x0, elr_el1
-    ret
-
-get_esr_el1:
-    mrs x0, esr_el1
-    ret
-
-get_vbar_el1:
-    mrs x0, vbar_el1
-    ret
-
-get_cntfrq_el0:
-    mrs x0, cntfrq_el0
-    ret
-
-get_cntpct_el0:
-    mrs x0, cntpct_el0
-    ret
-
-get_current_el:
-    mrs x0, CurrentEL
-    lsr x0, x0, #2
-    ret
-
 /*
 // Switch to EL0 and execute the user program at EL0
 // x0 = program address
@@ -195,3 +162,26 @@ exec_user_program:
     msr elr_el1, x19    // Store the start address of user program to elr_el
     eret                // Exception Return using the `ELR` and `SPSR` for the "current" Exception level i.e, EL1
                         // When executed, the PE restores PSTATE from the `SPSR`, and branches to the address held in the `ELR` (start address of user program)
+
+
+// System register access functions
+get_spsr_el1:
+    mrs x0, spsr_el1
+    ret
+
+get_elr_el1:
+    mrs x0, elr_el1
+    ret
+
+get_esr_el1:
+    mrs x0, esr_el1
+    ret
+
+get_vbar_el1:
+    mrs x0, vbar_el1
+    ret
+
+get_current_el:
+    mrs x0, CurrentEL
+    lsr x0, x0, #2
+    ret    
