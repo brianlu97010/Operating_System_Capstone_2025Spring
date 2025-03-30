@@ -4,27 +4,21 @@
 #include "registers.h"
 #include "timer.h"
 
-void exception_init(){
+void exception_table_init(){
     // Get current EL
     unsigned long el = get_current_el();
-    muart_puts("Current Exception Level : EL ");
+    muart_puts("Current Exception Level : EL");
     muart_send_dec(el);
     muart_puts("\r\n");
 
     // Write the vector table base address to VBR_EL1
     set_exception_vector_table();
-    muart_puts("Exception handling initialized successful !\r\n");
+    muart_puts("Exception vector table initialized successful !\r\n");
 
     unsigned long vbar = get_vbar_el1();
     muart_puts("VBAR_EL1: ");
     muart_send_hex(vbar);
     muart_puts("\r\n");
-
-    // Enable the core timer and enable the timer interrupt of the first level interrupt controller
-    enable_core_timer();
-    muart_puts("Core timer initialized\r\n");
-    enable_core_timer_int();
-    muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
 }
 
 void unexpected_irq_handler(){

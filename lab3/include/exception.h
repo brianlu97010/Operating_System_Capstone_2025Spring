@@ -5,8 +5,8 @@
 #define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
 
 /* --- C functions --- */
-/* The API to initialize the exception vector table and enable the core's timer interrupt*/
-void exception_init(void);
+/* The API to initialize the exception vector table */
+void exception_table_init(void);
 
 /* The SVC-specific handler: print the system reg's content */ 
 void svc_handler(void);

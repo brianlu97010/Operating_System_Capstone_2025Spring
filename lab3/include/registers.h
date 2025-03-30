@@ -25,6 +25,7 @@
 #define INTERRUPT_BASE          (MMIO_BASE+0x0000B000)
 #define IRQ_PEND1               (INTERRUPT_BASE+0x204)  // IRQ pending 1 register
 #define ENABLE_IRQS1            (INTERRUPT_BASE+0x210)  // Enable IRQs 1 register
+#define DISABLE_IRQS1           (INTERRUPT_BASE+0x21C)  // Disable IRQs 1 register
 
 /* Mailbox registers */
 #define MAILBOX_BASE            (MMIO_BASE+0xB880)

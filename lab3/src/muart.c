@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "types.h"
 #include "string.h"
+#include "exception.h"
 #include "timer.h"
 
 char muart_receive(){
@@ -153,6 +154,17 @@ void async_uart_init(){
     regWrite(ENABLE_IRQS1, (1 << 29));
 }
 
+void disable_uart_int() {
+    // Disable both RX and TX interrupts in the UART
+    regWrite(AUX_MU_IER_REG, 0);
+    
+    // Flush the RX and TX FIFO
+    regWrite(AUX_MU_IIR_REG, 6);        // Set AUX_MU_IIR_REG to 6, clear the rx and tx FIFO
+
+    // Disable UART interrupt at the second-level controller (bit 29)
+    regWrite(DISABLE_IRQS1, (1 << 29));
+}
+
 // The UART-specific handler, it will determine the interrupt type and read the data into RX buffer or transmit the data from TX buffer
 void uart_irq_handler(void){
     // Determine interrupt type : On read this register bits[2:1] shows the interrupt ID bit
@@ -243,7 +255,7 @@ void async_uart_example(){
     async_uart_init();
     
     // Enable interrupts in EL1 
-    __asm__ volatile ("msr DAIFClr, 0xf");
+    enable_irq_in_el1();
     
     // Buffer for the reading data
     char buffer[64] = {0};
@@ -277,6 +289,11 @@ void async_uart_example(){
                     async_uart_puts(buffer);
                     async_uart_puts("\r\n");
                     
+                    // Wait for TX buffer to empty
+                    while (tx_head != tx_tail) {
+                        waitCycle(10);
+                    }
+
                     // Check for exit command
                     if (i == 4 && 
                         buffer[0] == 'e' && 
@@ -293,13 +310,15 @@ void async_uart_example(){
             }
         }
         
-        muart_puts("\r\nNext Instruction\r\n");
-        waitCycle(200000000);
+        // muart_puts("\r\nNext Instruction\r\n");
+        waitCycle(100);
     }
     
-    // Disable interrupts
-    __asm__ volatile ("msr DAIFSet, 0xf");
+    // Disable EL1 interrupts
+    disable_irq_in_el1();
+
+    // Disable muart interrupt
+    disable_uart_int();
     
     muart_puts("Exiting async UART example\r\n");
-    enable_core_timer_int();
 }

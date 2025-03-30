@@ -7,6 +7,7 @@
 #include "cpio.h"
 #include "malloc.h"
 #include "types.h"
+#include "timer.h"
 
 // Declaration of command
 static int cmd_help(int argc, char* argv[]);
@@ -18,6 +19,7 @@ static int cmd_cat(int argc, char* argv[]);
 static int cmd_memAlloc(int argc, char* argv[]);
 static int cmd_exec_prog(int argc, char* argv[]);
 static int cmd_async_uart(int argc, char* argv[]);
+static int cmd_set_timeout(int argc, char* argv[]);
 
 // Define a command table
 static const cmd_t cmdTable[] = {
@@ -33,6 +35,7 @@ static const cmd_t cmdTable[] = {
                 "space for requested size\r\n",               cmd_memAlloc},
     {"exec", "\t\t: execute a user program at EL0\r\n\t\t  Usage: exec <filename>\r\n", cmd_exec_prog},
     {"auart", "\t\t: Example of using async UART for reading/writing data\r\n", cmd_async_uart},
+    {"setTimeout", "\t: set a timeout to display a message\r\n\t\t  Usage: setTimeout \"MESSAGE\" SECONDS\r\n", cmd_set_timeout},
     {NULL, NULL, NULL}
 };
 
@@ -111,16 +114,52 @@ static int cmd_exec_prog(int argc, char* argv[]){
         return -1;
     }
     
+    // Set core timer expired time to 2 secs
+    set_core_timer();
+    // Enable the timer interrupt of the first level interrupt controller 
+    enable_core_timer_int();
+    
+    muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
+    
     // Get the initramfs address
     void* initramfs_addr = get_cpio_addr();
     
     // Execute the user program from the initramfs
     cpio_exec(initramfs_addr, argv[1]);
+
+    // Disable core timer interrupt
+    disable_core_timer_int();
+
     return 0;
 }
 
 static int cmd_async_uart(int argc, char* argv[]){
     async_uart_example();
+    return 0;
+}
+
+int cmd_set_timeout(int argc, char* argv[]){    
+    if (argc < 3){
+        muart_puts("Usage: setTimeout \"MESSAGE\" SECONDS\r\n");
+        return -1;
+    }
+    
+    const char* message = argv[1];
+    int seconds = atoi(argv[2]);
+    
+    if (seconds <= 0){
+        muart_puts("Error: Timeout must be a positive integer\r\n");
+        return -1;
+    }
+
+    setTimeout(message, seconds);
+    
+    muart_puts("Timeout set: \"");
+    muart_puts(message);
+    muart_puts("\" will be displayed after ");
+    muart_send_dec(seconds);
+    muart_puts(" seconds\r\n");
+    
     return 0;
 }
 
