@@ -54,6 +54,9 @@ void svc_handler(){
     if( ec == 0x15 ){
         muart_puts("SVC instruction exception from AArch64 execution state\r\n");
     }
+    else if( ec == 0 ){
+        muart_puts("Exceptions with an unknown reason \r\n");
+    }
     else{
         muart_puts("other cause \r\n");
     }

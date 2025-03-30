@@ -120,14 +120,8 @@ void timer_mul_irq_handler(){
         timer_callback_t callback = expired_timer->callback;
         void* data = expired_timer->data;
 
-        // Exit Critical Section, some callback might need interrupt
-        enable_irq_in_el1();
-
         // execute the callback function
         callback(data);
-
-        // Enter Critical Section to protect the global timer queue
-        disable_irq_in_el1();
     }
 
     // If Timer Queue exists timer not executed, reset the core timer
@@ -209,6 +203,8 @@ int setTimeout(const char* message, unsigned int seconds){
     msg->message[sizeof(msg->message) - 1] = '\0';
     msg->creation_time = get_system_time();
     
+    disable_core_timer_int();
     addTimer(print_timeout_message, seconds, msg);
+    enable_core_timer_int();
     return 0;
 }
