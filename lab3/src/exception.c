@@ -51,14 +51,16 @@ void svc_handler(){
     unsigned long ec = (esr >> 26) & 0x3F;   // right shift 26 bits and get the last 6 bits
     
     muart_puts("Cause of exception : ");
-    if( ec == 0x15 ){
-        muart_puts("SVC instruction exception from AArch64 execution state\r\n");
-    }
-    else if( ec == 0 ){
-        muart_puts("Exceptions with an unknown reason \r\n");
-    }
-    else{
-        muart_puts("other cause \r\n");
+    switch(ec) {
+        case 0x15:
+            muart_puts("SVC instruction exception from AArch64 execution state\r\n");
+            break;
+        case 0:
+            muart_puts("Exceptions with an unknown reason \r\n");
+            break;
+        default:
+            muart_puts("other cause \r\n");
+            break;
     }
 }
 
