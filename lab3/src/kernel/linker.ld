@@ -7,13 +7,13 @@ SECTIONS
     .rodata : { *(.rodata) }
     .data : { *(.data) }
 
-    . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */
+    . = ALIGN(0x1000);  /* Align 4KB */
     bss_begin = .;
     .bss (NOLOAD) : { *(.bss) }
     bss_end = .;
 
     /* Initialize the address and the size of heap */
-    . = ALIGN(0x8);  /* For 64 bits data, aligned the memory address in 8 bytes */ 
+    . = ALIGN(0x1000);  /* Align 4KB */ 
     heap_begin = .;
     . = . + 0x100000;   /* Allocate 1MB to heap (pre-allocated memory pool) */
     heap_end = .;
