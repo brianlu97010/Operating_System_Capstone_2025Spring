@@ -109,9 +109,6 @@ static void insert_timer(timer_t* new_timer){
 void timer_mul_irq_handler(){
     unsigned long current_time = get_system_time();
 
-    // Enter Critical Section to protect the global timer queue
-    disable_irq_in_el1();
-
     // Execute all expired timer (some might be time-sensative)
     while( timer_list != NULL && timer_list->expired_time <= current_time ){
         timer_t* expired_timer = timer_list;
@@ -120,8 +117,14 @@ void timer_mul_irq_handler(){
         timer_callback_t callback = expired_timer->callback;
         void* data = expired_timer->data;
 
+        // Exit Critical Section, for nested loop (Todo)
+        // enable_irq_in_el1();
+
         // execute the callback function
         callback(data);
+
+        // Enter Critical Section to protect the global timer queue
+        // disable_irq_in_el1();
     }
 
     // If Timer Queue exists timer not executed, reset the core timer
@@ -138,9 +141,7 @@ void timer_mul_irq_handler(){
     else{
         disable_core_timer_int();
     }
-
-    // Exit Critical Section (For the latest while loop)
-    enable_irq_in_el1();   
+  
     return;
 }
 
