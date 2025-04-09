@@ -1,2 +1,5 @@
 **test
 **.vscode
+**build
+**/*.elf
+**/*.img
