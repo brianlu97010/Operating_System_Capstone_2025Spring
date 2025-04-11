@@ -21,8 +21,10 @@ typedef struct cpio_newc_header{
     char    c_check[8]; 
 } cpio_newc_header;
 
-/* Round up to a multiple of 4
- * Will be used to align filedata size to 4 bytes */
+/* 
+ * Round up to a multiple of 4
+ * Will be used to align filedata size to 4 bytes 
+ */
 unsigned int cpio_padded_size(unsigned int);
 
 /* Convert ASCII string (stored in hex format) to unsigned int (The New ASCII Format uses 8-byte hexadecimal fields) */
@@ -34,6 +36,7 @@ void cpio_ls(const void*);
 /* Print the file data in the CPIO archive */
 void cpio_cat(const void*, const char*);
 
+/* Execute the user program in initramfs in EL0 */
 void cpio_exec(const void* cpio_file_addr, const char* file_name);
 
 /* The API for other modules set the initramfs_address */

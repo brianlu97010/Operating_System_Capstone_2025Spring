@@ -5,20 +5,27 @@
 
 static unsigned int initramfs_address = 0x20000000;
 
+/* The API for other modules set the initramfs_address */
 void set_initramfs_address(unsigned int addr) {
     initramfs_address = addr;
 }
 
+/* The API for other modules get the initramfs_address */
 const void* get_cpio_addr(void) {
     return (const void*)initramfs_address;
 }
 
+/* 
+ * Round up to a multiple of 4
+ * Will be used to align filedata size to 4 bytes 
+ */
 inline unsigned int cpio_padded_size(unsigned int size) {
     // If the value is the multiple of 4, then its last 2 bits must be 0
     // Add 3 to ensure round "up" tto the next multiple of 4 
     return (size + 3) & ~3;  
 }
 
+/* Convert ASCII string (stored in hex format) to unsigned int (The New ASCII Format uses 8-byte hexadecimal fields) */
 unsigned int cpio_hex_to_int(const char* hex, unsigned int len){
     unsigned int result = 0;
     for(int i = 0; i < len; i++){
@@ -41,6 +48,7 @@ unsigned int cpio_hex_to_int(const char* hex, unsigned int len){
     return result;
 }
 
+/* List all files in the CPIO archive */
 void cpio_ls(const void* cpio_file_addr){
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;
@@ -72,6 +80,7 @@ void cpio_ls(const void* cpio_file_addr){
     return;
 }
 
+/* Print the file data in the CPIO archive */
 void cpio_cat(const void* cpio_file_addr, const char* file_name){
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;
@@ -113,6 +122,7 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
     return;
 }
 
+/* Execute the user program in initramfs in EL0 */
 void cpio_exec(const void* cpio_file_addr, const char* file_name){
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;

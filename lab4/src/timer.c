@@ -6,6 +6,7 @@
 
 static timer_t* timer_list = NULL;
 
+/* Enable the core timer and disable the core timer interrupt at initialization first */
 void core_timer_init() {
     // Enable the core timer
     enable_core_timer();
@@ -30,6 +31,7 @@ unsigned long get_system_time(){
     return timer_count / timer_freq;
 }
 
+/* Timer basic specific IRQ handler: Print elapsed time since boot and reset timer  */
 void timer_basic_irq_handler(){
     // Print elapsed time
     muart_puts("Time since boot: ");
@@ -40,7 +42,7 @@ void timer_basic_irq_handler(){
     set_core_timer();
 }
 
-// Handle timer interrupt
+/* The timer-specific handler */
 void timer_irq_handler(void){
     // If Timer Queue has timer, use the timer multiplexing
     if (timer_list != NULL) {
@@ -165,7 +167,7 @@ void addTimer(timer_callback_t callback, unsigned int seconds, void* data){
     insert_timer(new_timer);
 }
 
-// Callback Function of timeout interrupt - Print the message
+/* Callback Function of timeout interrupt - Print the message */
 static void print_timeout_message(void* data){
     // Casting to the structure of time out message
     timeout_message_t* msg = (timeout_message_t*)data;

@@ -4,12 +4,14 @@
 #include "types.h"
 #include "muart.h"
 
+/* Convert big-endian 32-bit value to little-endian 32-bit value */
 static inline unsigned int be_to_le32(unsigned int be32_val){
     char* bytes = (char*)&be32_val;         // Casting to char* for byte-by-byte access
     return (unsigned int)(bytes[0]<<24) | (unsigned int)(bytes[1]<<16) | (unsigned int)(bytes[2]<<8) | (unsigned int)(bytes[3]);
 }
 
-/* Traverse the device tree and call the callback function for each node
+/* 
+ * Traverse the device tree and call the callback function for each node
  *
  * Tree structure will be looks like : 
  * FDT_BEGIN_NODE token
@@ -21,7 +23,7 @@ static inline unsigned int be_to_le32(unsigned int be32_val){
  *    [zeroed padding bytes to align to a 4-byte boundary]
  * 
  * FDT_END_NODE token
-*/
+ */
 void fdt_traverse(const void* fdt, fdt_callback_t callback_func, void* data){
     // points to the loading address of .dtb
     const fdt_header* header = fdt;     
@@ -87,6 +89,7 @@ void fdt_traverse(const void* fdt, fdt_callback_t callback_func, void* data){
     }
 }
 
+/* Get the specific property's value, return a pointer point to the property value */
 const void* fdt_get_property(const void* fdt, const void* node_ptr, const char* expect_name){
     const fdt_header* header = fdt;
     const unsigned int* struct_ptr = node_ptr;
@@ -117,6 +120,7 @@ const void* fdt_get_property(const void* fdt, const void* node_ptr, const char* 
     }
 }
 
+/* Callback function to find the initramfs address in traversing device tree */
 int initramfs_callback(const void *fdt, const void *node_ptr, const char *node_name, int depth, void *data){
     initramfs_context_t* cxt = (initramfs_context_t*)data;
 
@@ -137,6 +141,7 @@ int initramfs_callback(const void *fdt, const void *node_ptr, const char *node_n
     return 1;
 }
 
+/* The API for getting the initramfs address from the device tree, return the address of initramfs */
 unsigned int get_initramfs_address(const void* fdt){
     // Initialize the context in initramfs
     muart_puts("Initializing the context in initramfs ! \r\n");

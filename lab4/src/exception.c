@@ -4,6 +4,7 @@
 #include "registers.h"
 #include "timer.h"
 
+/* The API to initialize the exception vector table */
 void exception_table_init(){
     // Get current EL
     unsigned long el = get_current_el();
@@ -25,6 +26,7 @@ void unexpected_irq_handler(){
     muart_puts("Unexpected IRQ \r\n");
 }
 
+/* The SVC-specific handler: print the system reg's content */ 
 void svc_handler(){
     // Call the assembly function to read the system register
     unsigned long spsr = get_spsr_el1();
@@ -64,6 +66,7 @@ void svc_handler(){
     }
 }
 
+/* High-level IRQ handler, determines the interrupt source and calls the specific handler */
 void irq_entry(void) {
     // Load the value of core 0 interrupt source
     unsigned int irq_status = regRead(CORE0_IRQ_SRC);

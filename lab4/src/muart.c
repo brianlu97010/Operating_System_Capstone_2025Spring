@@ -6,6 +6,7 @@
 #include "exception.h"
 #include "timer.h"
 
+/* Receive the cahr data transmitted from host */ 
 char muart_receive(){
     while ( !(regRead(AUX_MU_LSR_REG) & 1) ){
         // do nothing
@@ -14,6 +15,7 @@ char muart_receive(){
     return regRead(AUX_MU_IO_REG)&0xFF;
 }
 
+/* Transmit the char data to host */ 
 void muart_send(const char c){
     while ( !(regRead(AUX_MU_LSR_REG) & 32) ){
         // do nothing
@@ -23,6 +25,7 @@ void muart_send(const char c){
     return;
 }
 
+/* Write the C string str to the transmit FIFO by mini UART */ 
 void muart_puts(const char* str) {
     while(*str){
         muart_send(*str);
@@ -31,6 +34,7 @@ void muart_puts(const char* str) {
     return;
 }
 
+/* Transmit the int data to host in hex */
 void muart_send_hex(unsigned int value) {
     // Display prefix of hex
     muart_send('0');
@@ -56,6 +60,7 @@ void muart_send_hex(unsigned int value) {
     }
 }
 
+/* Transmit the int data to host in decimal */
 void muart_send_dec(unsigned int num){
     // Handle the case where num is 0
     if (num == 0){
@@ -87,6 +92,7 @@ void muart_send_dec(unsigned int num){
     }
 }
 
+/* Initialize the mini UART */
 void muart_init(){
     // Set GPIO pin 14 15 to ALT5
     unsigned int reg;
@@ -117,7 +123,11 @@ void muart_init(){
     regWrite(AUX_MU_CNTL_REG, 3);       // Set AUX_MU_CNTL_REG to 3. Enable the transmitter and receiver.
 }
 
-/* --- Async mini UART --- */
+/*
+ ****************************
+ *      Async mini UART     *
+ ****************************
+ */
 #define UART_BUFFER_SIZE 256
 
 // Use queue (circular array) to implement the RX and TX buffer
@@ -139,7 +149,7 @@ static inline int tx_buffer_is_full(){
     return ( (tx_head + 1) % UART_BUFFER_SIZE ) == tx_tail;
 }
 
-// Initialize asynchronous UART
+/* Initialize asynchronous UART with interrupt support */
 void async_uart_init(){
     // Reset buffer indices
     rx_head = rx_tail = 0;
@@ -165,7 +175,7 @@ void disable_uart_int() {
     regWrite(DISABLE_IRQS1, (1 << 29));
 }
 
-// The UART-specific handler, it will determine the interrupt type and read the data into RX buffer or transmit the data from TX buffer
+/* The UART-specific handler, it will determine the interrupt type and read the data into RX buffer or transmit the data from TX buffer */
 void uart_irq_handler(void){
     // Determine interrupt type : On read this register bits[2:1] shows the interrupt ID bit
     unsigned int interrupt_id = ( regRead(AUX_MU_IIR_REG) >> 1) & 3;
@@ -201,7 +211,7 @@ void uart_irq_handler(void){
     }
 }
 
-// Non-blocking read : Read the data from the Receive Buffer
+/* Non-blocking read : Read the data from the Receive Buffer */
 size_t async_uart_read(char* buffer, size_t size){
     size_t count = 0;
     
@@ -214,7 +224,7 @@ size_t async_uart_read(char* buffer, size_t size){
     return count;   // How many bytes we read
 }
 
-// Non-blocking write : Write the data into the Transmit Buffer
+/* Non-blocking write : Write the data into the Transmit Buffer */ 
 size_t async_uart_write(const char* buffer, size_t size) {
     size_t count = 0;
     int tx_was_empty = (tx_head == tx_tail);
@@ -234,7 +244,7 @@ size_t async_uart_write(const char* buffer, size_t size) {
     return count;   // How many bytes we send
 }
 
-// Non-blocking puts for strings
+/* Non-blocking puts for strings */
 size_t async_uart_puts(const char* str) {
     if (str == NULL) {
         return 0;
@@ -246,7 +256,7 @@ size_t async_uart_puts(const char* str) {
 
 
 
-// Example of using async UART for reading/writing data
+/* Example of using async UART for reading/writing data */
 void async_uart_example(){
     // Disable the timer interrupt for unexpected msg
     disable_core_timer_int();
