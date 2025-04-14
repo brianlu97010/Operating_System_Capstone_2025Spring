@@ -4,6 +4,13 @@
 #include "cpio.h"
 #include "exception.h"
 #include "timer.h"
+#include "malloc.h"
+
+/* Global buddy system instance */
+buddy_system_t buddy;
+
+/* Page array for buddy system */
+page_t page_array[BUDDY_MEM_SIZE / PAGE_SIZE];
 
 void main(void* fdt){    
     // Initialize mini UART
@@ -28,6 +35,14 @@ void main(void* fdt){
     
     core_timer_init();
     muart_puts("Core timer initialized successful !\r\n");
+
+    // Initialize the buddy allocator and memory pools
+    buddy_init(&buddy, (void *)BUDDY_MEM_START, BUDDY_MEM_SIZE, page_array);    
+    memory_pools_init();
+    muart_puts("Dynamic allocator initialized successful !\r\n");
+
+    // Demo of the dynamic allocator
+    dynamic_allocator_demo();
 
     // Start Simple Shell
     shell();

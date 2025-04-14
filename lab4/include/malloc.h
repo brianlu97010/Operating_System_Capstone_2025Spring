@@ -51,4 +51,59 @@ void* buddy_alloc_pages(buddy_system_t* buddy, unsigned int order);
 
 /* Free the allocated pages */
 void buddy_free_pages(buddy_system_t* buddy, void* addr);
+
+
+/* --- Dynamic Allocator Data Structures and API --- */
+typedef struct chunk_t {
+    struct chunk_t* next;  // List of the next chunk
+} chunk_t;
+
+typedef struct pool_t {
+    unsigned int chunk_size;        // Size of each chunk in this memory pool
+    chunk_t* free_chunks;           // Pointer to the list of free chunks
+    void* page_address;             // Starting address of the page
+    unsigned int nr_free_chunks;    // Current number of free chunks
+    unsigned int total_chunks;      // Total number of chunks in the page
+} pool_t;
+
+/* Initialize the memory pools */
+void memory_pools_init();
+
+/**
+ * @brief Allocates memory of specified size
+ * 
+ * This function allocates memory of the requested size. 
+ * For large allocations, it call the buddy allocator to allocate full pages.
+ * For small allocations (less than or equal to the largest chunk size)
+ * it round up the requested allocation size to the nearest size and 
+ * check if there is any unallocated slot. If not, allocate a new page frame 
+ * from the page allocator. Then, return one chunk to the caller., it uses a pool allocator
+ * that divides pages into chunks of fixed sizes. 
+ * 
+ * 
+ * @param size The requested size in bytes
+ * @return void* Pointer to allocated memory or NULL if allocation fails
+ */
+void* dmalloc(size_t size);
+
+/**
+ * @brief Frees memory allocated with dmalloc
+ * 
+ * This function returns memory previously allocated with dmalloc back to the
+ * appropriate memory pool or to the buddy allocator. If the memory block
+ * is page-aligned, it checks if it belongs to a memory pool (chunk 0) before
+ * returning it to the buddy allocator. When all chunks in a memory pool page 
+ * are freed, the entire page is returned to the buddy allocator.
+ * 
+ * @param ptr Pointer to memory block to free, or NULL (no-op)
+ */
+void dfree(void* ptr);
+
+
+/* Demo */
+/* Memory area for buddy system */
+#define BUDDY_MEM_START 0x10000000
+#define BUDDY_MEM_SIZE  (16 * 1024 * 1024)  /* 16MB */
+void dynamic_allocator_demo();
+
 #endif
