@@ -1,6 +1,7 @@
 # OSC 2025 | Lab 3: Exception and Interrupts
+> [!IMPORTANT]
 > Todo :
-> Advanced Exercise 2 - Concurrent I/O Devices Handling
+> [Advanced Exercise 2 - Concurrent I/O Devices Handling](#advanced-exercise-2---concurrent-io-devices-handling)
 
 ## Basic Exercise 1: Exceptions
 ### EL2 to EL1
