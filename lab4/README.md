@@ -1,4 +1,8 @@
 # OSC 2025 | Lab 4: Allocator
+> [!IMPORTANT]
+> Todo :
+> [Advanced Exercise 2 - Concurrent I/O Devices Handling](#advanced-exercise-2---reserved-memory-&-startup-allocation)
+
 ## Basic Exercise 1: Buddy System
 
 The buddy system is a well-known algorithm for allocating contiguous memory blocks. Our implementation:
@@ -43,6 +47,23 @@ Our implementation includes comprehensive logging to help with debugging and vis
 - Allocation and deallocation events are logged
 - Block splitting and merging operations are recorded
 - Memory pool status updates are provided
+
+## Advanced Exercise - Reserved Memory & Startup Allocation
+* Design an API to reserve memory blocks.
+* Implement the startup allocation.
+> [!NOTE]
+> * Your buddy system should still work when the memory size is large or contains memory holes. The usable memory region is from 0x00 to 0x3C000000, you can get this information from the memory node in devicetree.
+> * All the usable memory should be used, and you should allocate the page frame array dynamically.
+> * Reserved memory block detection is not part of the startup allocator. Call the API designed in the previous section to reserve those regions.
+> * You can either get the memory information from the devicetree, or just simply hardcode it, below are the memory regions that have to be reserved:
+>   1. Spin tables for multicore boot (0x0000 - 0x1000)
+>   2. Kernel image in the physical memory
+>   3. Initramfs
+>   4. Devicetree (Optional, if you have implement it)
+>   5. Your simple allocator (startup allocator)
+
+
+
 
 ## Usage
 
