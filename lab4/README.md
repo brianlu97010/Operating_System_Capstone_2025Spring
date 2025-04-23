@@ -1,7 +1,7 @@
 # OSC 2025 | Lab 4: Allocator
 > [!IMPORTANT]
 > Todo :
-> [Advanced Exercise 2 - Concurrent I/O Devices Handling](#advanced-exercise-2---reserved-memory-&-startup-allocation)
+> [Advanced Exercise 2 - Concurrent I/O Devices Handling](#advanced-exercise---reserved-memory--startup-allocation)
 
 ## Basic Exercise 1: Buddy System
 
