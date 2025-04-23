@@ -1,4 +1,6 @@
 # OSC 2025 | Lab 3: Exception and Interrupts
+> Todo :
+> Advanced Exercise 2 - Concurrent I/O Devices Handling
 
 ## Basic Exercise 1: Exceptions
 ### EL2 to EL1
@@ -302,3 +304,10 @@ This command uses the timer multiplexing system as follows:
    - Multiple timeouts can be set concurrently
    - Each will be processed independently when its timer expires
    - The printing order is determined by the expiration times, not the order of creation
+  
+
+## Advanced Exercise 2 - Concurrent I/O Devices Handling
+> [!IMPORTANT]
+> * Implement a task queue mechanism, so interrupt handlers can add their processing tasks to it.
+> * Execute the tasks in the queue before returning to the user program with interrupts enabled.
+> * Implement the task queue’s preemption mechanism.
