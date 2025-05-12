@@ -20,7 +20,7 @@ void* simple_alloc(size_t size);
 #define PAGE_FLAG_USED 1    // Page frame is currently allocated
 
 /* Printlog message */
-#define LOG_MALLOC 1
+#define LOG_MALLOC 0
 
 /* Page descriptor: decribe properties of the page frame */
 typedef struct page_t{

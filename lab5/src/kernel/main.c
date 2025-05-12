@@ -5,6 +5,7 @@
 #include "exception.h"
 #include "timer.h"
 #include "malloc.h"
+#include "sched.h"
 
 /* Global buddy system instance */
 buddy_system_t buddy;
@@ -42,7 +43,12 @@ void main(void* fdt){
     muart_puts("Dynamic allocator initialized successful !\r\n");
 
     // Demo of the dynamic allocator
-    dynamic_allocator_demo();
+    // dynamic_allocator_demo();
+
+    // Test thread mechanism
+    muart_puts("\r\n=== Starting Thread Test ===\r\n");
+    thread_test();
+    muart_puts("=== Thread Test Completed ===\r\n");
 
     // Start Simple Shell
     shell();
