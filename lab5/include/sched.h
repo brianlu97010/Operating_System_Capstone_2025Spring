@@ -46,4 +46,8 @@ void schedule(void);
 void thread_exit(void);
 unsigned long get_current_thread(void);
 
+// External variables
+extern struct list_head task_lists;
+extern struct list_head rq;
+
 #endif

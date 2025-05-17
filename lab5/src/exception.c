@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "registers.h"
 #include "timer.h"
+#include "syscall.h"
 
 /* The API to initialize the exception vector table */
 void exception_table_init(){
@@ -26,7 +27,7 @@ void unexpected_irq_handler(){
     muart_puts("Unexpected IRQ \r\n");
 }
 
-/* The SVC-specific handler: print the system reg's content */ 
+/* The SVC-specific handler: print the system reg's content and handle system calls */ 
 void svc_handler(){
     // Call the assembly function to read the system register
     unsigned long spsr = get_spsr_el1();
@@ -56,9 +57,30 @@ void svc_handler(){
     switch(ec) {
         case 0x15:
             muart_puts("SVC instruction exception from AArch64 execution state\r\n");
+            // Handle system call
+            syscall_handler();
             break;
         case 0:
             muart_puts("Exceptions with an unknown reason \r\n");
+            // Print additional diagnostic information
+            muart_puts("Current Exception Level: ");
+            unsigned long current_el = get_current_el();
+            muart_send_dec(current_el);
+            muart_puts("\r\n");
+            
+            // Check if we're in EL0
+            if (current_el == 0) {
+                muart_puts("Running in EL0\r\n");
+            } else {
+                muart_puts("Not in EL0\r\n");
+            }
+            
+            // Check CPU timer status
+            unsigned long cntkctl;
+            asm volatile("mrs %0, cntkctl_el1" : "=r"(cntkctl));
+            muart_puts("CNTKCTL_EL1: ");
+            muart_send_hex(cntkctl);
+            muart_puts("\r\n");
             break;
         default:
             muart_puts("other cause \r\n");

@@ -4,6 +4,7 @@
 
 #define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
 
+#ifndef __ASSEMBLER__
 /* --- C functions --- */
 /* The API to initialize the exception vector table */
 void exception_table_init(void);
@@ -35,5 +36,10 @@ extern unsigned long get_elr_el1(void);
 extern unsigned long get_esr_el1(void);
 extern unsigned long get_vbar_el1(void);
 extern unsigned long get_current_el(void);
+
+/* Enble / Disable el1 interrupts */
+extern void enable_irq_in_el1(void);
+extern void disable_irq_in_el1(void);
+#endif
 
 #endif

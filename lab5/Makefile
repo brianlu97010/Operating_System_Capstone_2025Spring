@@ -24,7 +24,7 @@ OBJFILES = $(COBJFILES) $(ASMOBJFILES)
 BOOT_SRCDIR = src/bootloader
 BOOT_LINKER = $(BOOT_SRCDIR)/linker.ld
 BOOT_CFILES = $(BOOT_SRCDIR)/main.c $(SRCDIR)/muart.c $(SRCDIR)/utils.c $(SRCDIR)/string.c
-BOOT_ASMFILES = $(BOOT_SRCDIR)/boot.S $(SRCDIR)/timer.S
+BOOT_ASMFILES = $(BOOT_SRCDIR)/boot.S
 BOOT_OBJFILES = $(patsubst $(SRCDIR)/%.c,$(SRC_BUILD_DIR)/%.c.o,$(filter $(SRCDIR)/%,$(BOOT_CFILES)))
 BOOT_OBJFILES += $(patsubst $(SRCDIR)/%.S,$(SRC_BUILD_DIR)/%.S.o,$(filter $(SRCDIR)/%,$(BOOT_ASMFILES)))
 

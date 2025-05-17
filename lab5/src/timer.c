@@ -12,11 +12,10 @@ void core_timer_init() {
     enable_core_timer();
     disable_core_timer_int();
     
-    // Reset timer
+    // Reset timer with frequency shifted right by 5 bits
     asm volatile (
         "mrs x0, cntfrq_el0\n\t"  // Read the frequency of the system counter
-        "mov x1, #30\n\t"         // Load 30 into x1
-        "mul x0, x0, x1\n\t"      // Multiply system frequency by 30
+        "lsr x0, x0, #5\n\t"      // Shift right by 5 bits
         "msr cntp_tval_el0, x0\n\t" // Set CNTP_TVAL_EL0 for next timer interrupt
     );
 }

@@ -19,7 +19,7 @@
 // #define NR_TASKS 64
 
 // Using doubly-linked list to maintain all task list
-static struct list_head task_lists;
+struct list_head task_lists;
 
 // static struct task_struct* tasks[NR_TASKS];
 // static int nr_tasks = 0;
@@ -31,7 +31,7 @@ static pid_bitmap_t pid_bitmap;
 
 // run queue 先只用一個 list 維護
 // Run queue use a circular doubly linked list mantain
-static struct list_head rq;
+struct list_head rq;
 
 static struct task_struct* idle_task = NULL;       // Idle thread
 

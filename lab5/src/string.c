@@ -74,3 +74,34 @@ char* strncpy(char* dest, const char* src, size_t n){
     
     return dest;
 }
+
+void* memcpy(void* dest, const void* src, size_t n) {
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
+
+/**
+ * Compares at most the first n bytes of str1 and str2.
+ * 
+ * @param str1 First string to compare
+ * @param str2 Second string to compare
+ * @param n Maximum number of characters to compare
+ * @return <0 if str1 < str2; 0 if equal; >0 if str1 > str2
+ */
+int strncmp(const char* str1, const char* str2, size_t n) {
+    while (n-- > 0) {
+        if (*str1 != *str2) {
+            return (unsigned char)*str1 - (unsigned char)*str2;
+        }
+        if (*str1 == '\0') {
+            return 0;
+        }
+        str1++;
+        str2++;
+    }
+    return 0;
+}

@@ -1,3 +1,6 @@
+#include "syscall.h"
+#include "exception.h"
+
 .global exec_user_program
 .global set_exception_vector_table
 .global get_spsr_el1
@@ -5,6 +8,8 @@
 .global get_esr_el1
 .global get_vbar_el1
 .global get_current_el
+.global enable_irq_in_el1
+.global disable_irq_in_el1
 
 
 
@@ -51,6 +56,78 @@
 .endm
 
 
+.macro kernel_entry, el
+    sub sp, sp, 34 * 8           // Creates space on the stack to store all 31 general-purpose registers (x0-x30) and sp_el0, elr_el1, spsr_el1, each register is 64bit-width = 8bytes
+    stp x0, x1, [sp ,16 * 0]     // Use "Store Pairs" instruction to store two 64bit registers in one instruction, note that [<SP>, #imm] means storing in <SP> + #imm (先加再存)
+    stp x2, x3, [sp ,16 * 1]
+    stp x4, x5, [sp ,16 * 2]
+    stp x6, x7, [sp ,16 * 3]
+    stp x8, x9, [sp ,16 * 4]
+    stp x10, x11, [sp ,16 * 5]
+    stp x12, x13, [sp ,16 * 6]
+    stp x14, x15, [sp ,16 * 7]
+    stp x16, x17, [sp ,16 * 8]
+    stp x18, x19, [sp ,16 * 9]
+    stp x20, x21, [sp ,16 * 10]
+    stp x22, x23, [sp ,16 * 11]
+    stp x24, x25, [sp ,16 * 12]
+    stp x26, x27, [sp ,16 * 13]
+    stp x28, x29, [sp ,16 * 14]
+
+    // 在不同的 EL 會用不同的 sp_elx 所以當我從 EL0 switch 到 EL1 時需要保存原本 EL0 在用的 sp 等到 exception 結束後將 原本 EL0 在用的 sp restore 
+	// if didn't store sp_el0: 
+	// thread A 執行 syscall，從 EL0 切換到 EL1
+	// 在內核中，發生中斷導致 context switch 到 thread B
+	// task B 也執行 syscall
+	// syscall 完成後，返回進程 B 的 user mode
+	// then，調度器切換回 thread A，繼續執行之前被中斷的 syscall
+	// 如果沒有正確保存和恢復 SP_EL0，當進程 A 返回用戶模式時，thread A 可能會使用進程 B 的 sp_el0
+	.if	\el == 0		// if el == 0, then save sp_el0 to x21 register
+	    mrs	x21, sp_el0
+	.else				// if el == 1, then 計算進入異常前的 stack pointer 值（當前 sp + 34*8)
+	    add	x21, sp, 34 * 8
+	.endif
+
+	// store the system registers
+	mrs	x22, elr_el1
+	mrs	x23, spsr_el1
+
+	stp	x30, x21, [sp, #16 * 15] 	// store the link register and sp_el0 to stack
+	stp	x22, x23, [sp, #16 * 16]	// store the elr_el1 and spsr_el1 to stack
+.endm
+
+.macro	kernel_exit, el
+	ldp	x22, x23, [sp, #16 * 16]
+	ldp	x30, x21, [sp, #16 * 15] 
+
+	.if	\el == 0
+	msr	sp_el0, x21
+	.endif
+
+	msr	elr_el1, x22			
+	msr	spsr_el1, x23
+
+
+	ldp	x0, x1, [sp, #16 * 0]
+	ldp	x2, x3, [sp, #16 * 1]
+	ldp	x4, x5, [sp, #16 * 2]
+	ldp	x6, x7, [sp, #16 * 3]
+	ldp	x8, x9, [sp, #16 * 4]
+	ldp	x10, x11, [sp, #16 * 5]
+	ldp	x12, x13, [sp, #16 * 6]
+	ldp	x14, x15, [sp, #16 * 7]
+	ldp	x16, x17, [sp, #16 * 8]
+	ldp	x18, x19, [sp, #16 * 9]
+	ldp	x20, x21, [sp, #16 * 10]
+	ldp	x22, x23, [sp, #16 * 11]
+	ldp	x24, x25, [sp, #16 * 12]
+	ldp	x26, x27, [sp, #16 * 13]
+	ldp	x28, x29, [sp, #16 * 14]
+	add	sp, sp, 34 * 8		
+	eret
+.endm
+
+
 // Exception vector table, branch to the high-level exception handler
 .align 11                           // Exception Vector table must be aligned to 0x800 i.e, 2^11 bytes
 exception_vector_table:
@@ -64,7 +141,7 @@ exception_vector_table:
     b other_exception_handler       // SError/VSError
     .align 7
 
-    // Exception from the current EL while using SP_ELx <- lab3
+    // Exception from the current EL while using SP_ELx
     b sync_exception_handler        // Synchronous
     .align 7            
     b irq_handler                   // IRQ/vIRQ
@@ -74,8 +151,8 @@ exception_vector_table:
     b other_exception_handler       // SError/VSError
     .align 7
 
-    // Exception from a lower EL and at least one lower EL is AArch64 <- lab3 (ex1, ex2)
-    b sync_exception_handler        // Synchronous
+    // Exception from a lower EL and at least one lower EL is AArch64
+    b el0_sync                      // Synchronous
     .align 7            
     b irq_handler                   // IRQ/vIRQ
     .align 7
@@ -121,6 +198,55 @@ other_exception_handler:
     bl unexpected_irq_handler
     load_all_reg                // Restore the registers after handling exception
     eret
+
+// Read the ESR register to determine the type of exception, if is svc, then jump to `el0_svc`
+// if not, then jump to `handle_invalid_entry`
+el0_sync:
+	kernel_entry 0					// argument 0 means EL0, store the registers to stack (trap frame)
+	mrs	x25, esr_el1				// read the syndrome register
+	lsr	x24, x25, 26		        // exception class (EC)
+	cmp	x24, 0x15			        // SVC in 64-bit state
+	b.eq	el0_svc				
+	b       unexpected_irq_handler
+
+sc_nr	.req	x25					// number of system calls
+scno	.req	x26					// syscall number
+stbl	.req	x27					// syscall table pointer
+
+/*
+el0_svc:
+	adr	stbl, sys_call_table			// load syscall table pointer to x27 register
+	uxtw	scno, w8				    // load syscall number in w8 to x26 register
+	mov	sc_nr, #__NR_syscalls			// load the total number of syscalls to x25 register
+	bl	enable_irq						// enable interrupts
+	cmp     scno, sc_nr                     	// check upper syscall limit, if bigger than the limit, jump to `ni_sys` and print the error message
+	b.hs	ni_sys
+	
+	// handle the syscall, get the address of the corresponding syscall function by using the syscall number as the index of the syscall table
+	ldr	x16, [stbl, scno, lsl #3]		// load the address in the syscall table to x16 register
+	blr	x16								// call sys_* routine (jump to the address in x16 register)
+	b	ret_from_syscall				// when the syscall is done, jump to `ret_from_syscall` to return to the user process
+*/
+
+el0_svc:
+    bl	enable_irq_in_el1			    // enable interrupts
+
+	// handle the syscall, get the address of the corresponding syscall function by using the syscall number as the index of the syscall table
+    bl  syscall_handler
+	b	ret_from_syscall				// when the syscall is done, jump to `ret_from_syscall` to return to the user process
+
+// ni_sys:
+// 	handle_invalid_entry 0, SYSCALL_ERROR
+
+// After the syscall is done, cpu will jump to this label
+// and first disable the interrupts
+// then save the return value (x0) of the syscall handler into the stack
+ret_from_syscall:
+	bl	enable_irq_in_el1				
+	str	x0, [sp, 0]				    // returned x0 from stack
+	kernel_exit 0					// restore the user context in the stack (because we save the return value of the syscall in the stack before, now 
+									// x0 regiser is the return value of the syscall), finally, called `eret` instruction to return to the user process (switching to EL0)
+
 
 /*
 // Switch to EL0 and execute the user program at EL0
@@ -185,3 +311,11 @@ get_current_el:
     mrs x0, CurrentEL
     lsr x0, x0, #2
     ret    
+
+enable_irq_in_el1: 
+    msr DAIFClr, 0xF
+    ret
+
+disable_irq_in_el1:
+    msr DAIFSet, 0xF
+    ret

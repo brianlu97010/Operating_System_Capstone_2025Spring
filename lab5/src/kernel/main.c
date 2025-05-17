@@ -24,8 +24,20 @@ void main(void* fdt){
 
     // Get the initramfs address from the device tree
     unsigned int initramfs_addr = get_initramfs_address(fdt);
+    if (initramfs_addr == 1) {
+        muart_puts("Error: Failed to get initramfs address from device tree\r\n");
+        return;
+    }
     muart_puts("Initramfs_addr is at ");
     muart_send_hex(initramfs_addr);
+    muart_puts("\r\n");
+
+    // Debug: Print the first few bytes at initramfs_addr
+    muart_puts("First 6 bytes at initramfs_addr: ");
+    const char* initramfs_ptr = (const char*)initramfs_addr;
+    for(int i = 0; i < 6; i++) {
+        muart_send(initramfs_ptr[i]);
+    }
     muart_puts("\r\n");
 
     // Update the initramfs address in CPIO module
@@ -46,9 +58,9 @@ void main(void* fdt){
     // dynamic_allocator_demo();
 
     // Test thread mechanism
-    muart_puts("\r\n=== Starting Thread Test ===\r\n");
-    thread_test();
-    muart_puts("=== Thread Test Completed ===\r\n");
+    // muart_puts("\r\n=== Starting Thread Test ===\r\n");
+    // thread_test();
+    // muart_puts("=== Thread Test Completed ===\r\n");
 
     // Start Simple Shell
     shell();

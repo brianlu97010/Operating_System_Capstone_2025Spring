@@ -1,10 +1,7 @@
-
 .global enable_core_timer
 .global set_core_timer
 .global enable_core_timer_int
 .global disable_core_timer_int
-.global enable_irq_in_el1
-.global disable_irq_in_el1
 .global get_cntfrq_el0
 .global get_cntpct_el0
 
@@ -12,6 +9,11 @@
 
 // Enable the core timer
 enable_core_timer:
+    // Enable CPU timer
+    mrs x0, cntkctl_el1
+    orr x0, x0, #1
+    msr cntkctl_el1, x0
+    
     // Set the cntp_ctl_el0.ENABLE bit to 1 i.e, Timer enabled
     mov x0, 1
     msr cntp_ctl_el0, x0
