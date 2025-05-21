@@ -57,8 +57,6 @@ void svc_handler(){
     switch(ec) {
         case 0x15:
             muart_puts("SVC instruction exception from AArch64 execution state\r\n");
-            // Handle system call
-            syscall_handler();
             break;
         case 0:
             muart_puts("Exceptions with an unknown reason \r\n");
