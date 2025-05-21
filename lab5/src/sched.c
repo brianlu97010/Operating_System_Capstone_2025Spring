@@ -5,48 +5,31 @@
 #include "utils.h"
 #include "bitmap.h"
 #include "pid.h"
-/* 先做 non-preemtive 的 schedule */
+#include "exception.h"
+#include "syscall.h"
 
-// Thread Create Progress : 
-// use `kernel_thread` to create a new thread and add it to run queue
-// 當 thread 第一次被 scheduling 的時候 ( schedule() 挑到這個 thread )
-// 做 context switch : save current thread 的 cpu context and restore the next thread 的 cpu context
-// 接著 `ret` (Defaults to X30 if absent) 跳到 lr 裡面的 address 也就是 `ret_from_kernel_thread`，
-// `ret_from_kernel_thread` 再帶著參數跳到指令的 function
-// 可以把 `ret_from_kernel_thread` 想成是一個 entry point，每一個 context switch 完後的 task 都會從這裡開始執行
 
-// 先預先定義整個 system 只能有 64 個 tasks，然後用一個 static global array maintain (之後考慮用 task list ?)
-// #define NR_TASKS 64
+/* Thread Mechanism Progress : 
+ * use `kernel_thread` to create a new thread and add it to run queue
+ * 當 thread 第一次被 scheduling 的時候 ( schedule() 挑到這個 thread )
+ * 做 context switch : save current thread 的 cpu context and restore the next thread 的 cpu context
+ * 接著 `ret` (Defaults to X30 if absent) 跳到 lr 裡面的 address 也就是 `ret_from_kernel_thread` <- 想成 kernel thread 的 entry point，每一個 context switch 完後的 task 都會從這裡開始執行
+ * `ret_from_kernel_thread` 再帶著參數 (x20) 跳到指定的 function (x19)
+ */
 
-// Using doubly-linked list to maintain all task list
+
+
+
+// Use doubly-linked list to maintain all tasks
 struct list_head task_lists;
-
-// static struct task_struct* tasks[NR_TASKS];
-// static int nr_tasks = 0;
-// PID 先這樣實作 : 每次 create 新的 thread， pid 就會++
-// static int next_pid = 1;    // PID 0 is reserved for the idle task
 
 // PID bitmap for managing PIDs
 static pid_bitmap_t pid_bitmap;
 
-// run queue 先只用一個 list 維護
-// Run queue use a circular doubly linked list mantain
+// Use a doubly-linked list to maintain the run queue
 struct list_head rq;
 
 static struct task_struct* idle_task = NULL;       // Idle thread
-
-// Functions that thread needs to do
-typedef void (*thread_func_t)(void *);
-
-/* --- Function defined in sched.S --- */
-/* Jump to the address in x19, with the argument in x20 */
-extern void ret_from_kernel_thread();
-
-/* Switch from the prev thread to the next thread */
-extern void cpu_switch_to(struct task_struct* prev, struct task_struct* next);
-
-/* Get the current thread from the system register tpidr_el1 */
-extern unsigned long get_current_thread();
 
 
 /* 
@@ -55,11 +38,15 @@ extern unsigned long get_current_thread();
  */
 pid_t kernel_thread(thread_func_t fn, void* arg) {
     struct task_struct* new_task;
+    
+    // Disable interrupt when creating a new thread (prevent race conditions when accessing global variable like run queue, pid_bitmap and task list)
+    disable_irq_in_el1();
 
-    // Allocate a memory space for the task descriptor of this task
+    // Allocate a memory space for the task descriptor of new task
     new_task = (struct task_struct*)dmalloc(sizeof(struct task_struct));
     if (!new_task) {
         muart_puts("Failed to allocate task structure\r\n");
+        enable_irq_in_el1();
         return -1;
     }
 
@@ -68,6 +55,7 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
     if (new_task->pid < 0) {
         dfree(new_task);
         muart_puts("Failed to allocate PID\r\n");
+        enable_irq_in_el1();
         return -1;
     }
 
@@ -75,71 +63,80 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
     new_task->state = TASK_RUNNING;
     new_task->parent = (struct task_struct*)get_current_thread();
     
-    // Allocate a memory space for the task's stack
-    new_task->stack = dmalloc(THREAD_STACK_SIZE);
-    if (!new_task->stack) {
+    // Allocate a memory space for the task's kernel stack
+    new_task->kernel_stack = dmalloc(THREAD_STACK_SIZE);
+    if (!new_task->kernel_stack) {
         pid_free(new_task->pid);
         dfree(new_task);
-        muart_puts("Failed to allocate stack\r\n");
+        muart_puts("Failed to allocate kernel stack\r\n");
+        enable_irq_in_el1();
         return -1;
     }
 
-    // Set the cpu context of idle task
-    new_task->cpu_context.sp = (unsigned long)((char*)new_task->stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's stack
-    new_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                           // Set the link register store the address of ret_from_kernel_thread
-    new_task->cpu_context.x19 = (unsigned long)fn;                                     // Store the function address into the callee-saved register
-    new_task->cpu_context.x20 = (unsigned long)arg;                                    // Store the function argurment into the callee-saved register
+    // Allocate a memory space for the task's user stack
+    new_task->user_stack = dmalloc(THREAD_STACK_SIZE);
+    if (!new_task->user_stack) {
+        muart_puts("Failed to allocate new task user stack\r\n");
+        enable_irq_in_el1();
+        return -1;
+    }
+
+    // Set the cpu context of new task
+    new_task->cpu_context.sp = (unsigned long)((char*)new_task->kernel_stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's kernel stack
+    new_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                                       // Set the link register store the address of ret_from_kernel_thread
+    new_task->cpu_context.x19 = (unsigned long)fn;                                                          // Store the function address into the callee-saved register
+    new_task->cpu_context.x20 = (unsigned long)arg;                                                         // Store the function argurment into the callee-saved register
 
     // Add the new task into the run queue
+    INIT_LIST_HEAD(&new_task->list);
+    list_add_tail(&new_task->list, &rq);
     /*
+     * INIT_LIST_HEAD : 
      * new_task.list
         ├─next──→ new_task.list  // 指向自己
         └─prev──→ new_task.list  // 指向自己 
      
-     * Add in to tail of run queue : 
-       runqueue ←→ idle_thread ←→ task0 ←→ "new task" ←→ (back to runqueue)
+     * Add into tail of run queue : 
+       run_queue ←→ task0 ←→ task1 ←→ "new task" ←→ runqueue
      */
-    INIT_LIST_HEAD(&new_task->list);
-    list_add_tail(&new_task->list, &rq);
-
+    
     // Add the new task into the task list
     INIT_LIST_HEAD(&new_task->task);
     list_add_tail(&new_task->task, &task_lists);
 
-    // Store into the task arrays
-    // if (nr_tasks < NR_TASKS) {
-    //     tasks[nr_tasks++] = new_task;
-    // }
-
+    enable_irq_in_el1();
     return new_task->pid;
 }
 
-/* Choose a thread to run 
- * 目前 schedule() 會在以下幾種情況被呼叫，現在只有實現 non-preemtive
+/* 
+ * Choose a thread to run 
+ * 目前 schedule() 只會在以下幾種情況被呼叫
  * 1. Thread Voluntary Yielding CPU
  * 2. Thread Exit (called in funtion `thread_exit()`)
  */
 void schedule(){
+    // Disable interrupt when pick a thread in run queue (prevent race conditions when accessing global variable like run queue, pid_bitmap and task list)
+    disable_irq_in_el1();
+
     struct task_struct* prev = (struct task_struct*)get_current_thread();
     struct task_struct* next = NULL;    // the next task to run
     struct list_head* ptr;
 
-    // if current thread is not idle task and still runnable, move it to the tail of run queue
+    // if current thread is not idle task and still runnable, move it to the tail of run queue (RR)
     if( (prev != NULL) && (prev != idle_task) && (prev->state==TASK_RUNNING) ){
         list_del(&prev->list);
         list_add_tail(&prev->list, &rq);
     }
 
-    // if run queue is empty, choose the idle task to run
+    // If run queue is empty, choose the idle task to run
     if( list_empty(&rq) ){
         next = idle_task;
     }
+    // If run queue is non-empty, find the next runnable task 
     else{
-        // Find the next runnable task (現在沒有 time slice，需要靠 task 主動放棄 CPU)
-        // Todo : 時間片機制、時鐘中斷、搶占式切換
         ptr = rq.next;
 
-        /* If we reached the end of run queue, wrap around */
+        // If we reached the end of run queue, wrap around
         if (ptr == &rq) {
             ptr = ptr->next;
         }
@@ -147,12 +144,12 @@ void schedule(){
         next = list_entry(ptr, struct task_struct, list);
     }
     
-    /* If no task found, choose idle task */
+    // If no task found, choose idle task
     if (next == NULL) {
         next = idle_task;
     }
 
-    /* Don't switch to the same task */
+    // If next thread to be executing is same as current thread, don't switch
     if (next != prev) {
         muart_puts("Switching from thread ");
         muart_send_dec(prev ? prev->pid : 0);
@@ -160,60 +157,55 @@ void schedule(){
         muart_send_dec(next->pid);
         muart_puts("\r\n");
         
-        /* Perform context switch */
+        // Perform context switch
         cpu_switch_to(prev, next);
+        return;
+    }
+    else {
+        // If no switch occurred, just enable interrupt and return
+        enable_irq_in_el1();
+        return;
     }
 }
 
-/* When a thread exit : set the state to ZOMBIE and remove from the run queue */
+/* When a thread exit, set the state to ZOMBIE and remove it from the run queue */
 void thread_exit(){
-    struct task_struct* cur = (struct task_struct*)get_current_thread();
-    cur->state = TASK_ZOMBIE;
+    // Disable interrupts when modifying task state and removing from run queue
+    // Will enable interrupt when picking the next thread to run (in ret_from_kernel_thread)
+    disable_irq_in_el1();
+
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    current->state = TASK_ZOMBIE;
 
     // Remove from the run queue
-    list_del(&cur->list);
+    list_del(&current->list);
 
     muart_puts("Thread ");
-    muart_send_dec(cur->pid);
+    muart_send_dec(current->pid);
     muart_puts(" exited\r\n");
     
-    /* Schedule to run another task */
+    // Pick the next thread to run
     schedule();
     
-    /* Should never reach here */
+    // Should never reach here
     while(1) {}
 }
 
-/* When the idle thread is scheduled, it checks if there is any zombie thread. If yes, it recycles them as follows. */
+/* 
+ * The function which the idle task will run
+ * When the idle thread is scheduled, it checks if there is any zombie thread : 
+ * If yes, it recycles the resources 
+ * If there is no zombie task, just yield the CPU
+ */
 void idle_task_fn(){
     muart_puts("Idle task started\r\n");
     
     while(1) {
-        /* 從全部的 task list 中 check 有沒有 zombie tasks and clean them up */
-        // for (int i = 0; i < nr_tasks; i++) {
-        //     if (tasks[i] && tasks[i]->state == TASK_ZOMBIE) {
-        //         struct task_struct* zombie = tasks[i];
-                
-        //         muart_puts("Cleaning up zombie thread ");
-        //         muart_send_dec(zombie->pid);
-        //         muart_puts("\r\n");
-                
-        //         /* Free resources : free the task's stack */
-        //         if (zombie->stack) {
-        //             /* In a real system, we'd free the stack here */
-        //             /* free(zombie->stack); */
-        //             dfree(zombie->stack);
-        //         }
-                
-        //         /* Mark as fully dead */
-        //         zombie->state = TASK_DEAD;
-                
-        //         /* Remove from tasks array */
-        //         tasks[i] = NULL;
-        //         nr_tasks--;
-        //     }
-        // }
-        /* 從全部的 task list 中 check 有沒有 zombie tasks and clean them up */
+        disable_irq_in_el1();
+
+        // Check if there is any zombie task in the task list
+        // If there is no zombie task, just yield the CPU
+        // If there is a zombie task, clean it  up
         struct list_head* pos;
         struct list_head* tmp;
         struct task_struct* zombie;
@@ -228,11 +220,15 @@ void idle_task_fn(){
                 muart_puts("\r\n");
                 
                 // Free the resoures : free the zombie task's stack
-                if (zombie->stack) {
-                    dfree(zombie->stack);
+                if (zombie->kernel_stack) {
+                    dfree(zombie->kernel_stack);
+                }
+
+                if (zombie->user_stack) {
+                    dfree(zombie->user_stack);
                 }
                 
-                // Mark as fully dead
+                // Mark the state of dead
                 zombie->state = TASK_DEAD;
                 
                 // Remove from task list 
@@ -242,24 +238,35 @@ void idle_task_fn(){
                 dfree(zombie);
             }
         }
-        
-        // Yield the CPU
+       
+        // Yield the CPU, pick the next thread to run
         schedule();
     }
 }
 
 /* Create and initialize the idle task */
 static void create_idle_task(){
+    disable_irq_in_el1();
+
     // Allocate the memory space of idle task
     idle_task = (struct task_struct*)dmalloc(sizeof(struct task_struct));
     if (!idle_task) {
         muart_puts("Failed to allocate idle task\r\n");
+        enable_irq_in_el1();
         return;
     }
     
-    idle_task->stack = dmalloc(THREAD_STACK_SIZE);
-    if (!idle_task->stack) {
-        muart_puts("Failed to allocate idle task stack\r\n");
+    idle_task->kernel_stack = dmalloc(THREAD_STACK_SIZE);
+    if (!idle_task->kernel_stack) {
+        muart_puts("Failed to allocate idle task kernel stack\r\n");
+        enable_irq_in_el1();
+        return;
+    }
+
+    idle_task->user_stack = dmalloc(THREAD_STACK_SIZE);
+    if (!idle_task->user_stack) {
+        muart_puts("Failed to allocate idle task user stack\r\n");
+        enable_irq_in_el1();
         return;
     }
     
@@ -268,21 +275,19 @@ static void create_idle_task(){
     idle_task->state = TASK_RUNNING;
     
     // Set the cpu context of idle task
-    idle_task->cpu_context.sp = (unsigned long)((char*)idle_task->stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's stack
-    idle_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                           // Set the link register store the address of ret_from_kernel_thread
-    idle_task->cpu_context.x19 = (unsigned long)idle_task_fn;                                     // Store the function address into the callee-saved register
+    idle_task->cpu_context.sp = (unsigned long)((char*)idle_task->kernel_stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's kernel stack
+    idle_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                                        // Set the link register store the address of ret_from_kernel_thread
+    idle_task->cpu_context.x19 = (unsigned long)idle_task_fn;                                                 // Store the function address into the callee-saved register
     INIT_LIST_HEAD(&idle_task->list);
-    INIT_LIST_HEAD(&idle_task->task);
-    // Add the idle task into the task list
-    list_add_tail(&idle_task->task, &task_lists);
     
-    // /* Store in tasks array */
-    // if (nr_tasks < NR_TASKS) {
-    //     tasks[nr_tasks++] = idle_task;
-    // }
-    // 初始化並加入執行佇列
+    // Add the idle task into the task list
+    INIT_LIST_HEAD(&idle_task->task);
+    list_add_tail(&idle_task->task, &task_lists);
+
+    enable_irq_in_el1();
 }
 
+/* Initialize the thread mechanism */
 void sched_init(){
     // Initialize task lists
     INIT_LIST_HEAD(&task_lists);
@@ -290,7 +295,7 @@ void sched_init(){
     // Initialize runqueue
     INIT_LIST_HEAD(&rq);
 
-    // Initialize PID bitmap
+    // Initialize bitmap of PID management
     pid_bitmap_init();
 
     // Create an idle task
@@ -302,12 +307,15 @@ void sched_init(){
     muart_puts("Thread scheduler initialized\r\n");
 }
 
+
+// 這裡上面都 OK 
+
 /* Basic Exercise 1 : Test the thread */
 void foo(void* data){
     for(int i = 0; i < 10; ++i){
-        struct task_struct* cur = (struct task_struct*)get_current_thread();
+        struct task_struct* current = (struct task_struct*)get_current_thread();
         muart_puts("Thread id : ");
-        muart_send_dec(cur->pid);
+        muart_send_dec(current->pid);
         muart_puts(", ");
         muart_send_dec(i);
         muart_puts("\r\n");
@@ -327,4 +335,98 @@ void thread_test(){
     idle_task_fn();
 
     while(1) {};
+}
+
+/* Basic Exercise 2 */
+// Trap frame
+struct pt_regs {
+    unsigned long regs[31];  // General purpose registers x0-x30
+    unsigned long sp;        // Stack pointer
+    unsigned long pc;        // Program counter
+    unsigned long pstate;    // Processor state
+};
+
+// Get pointer to pt_regs at the top of a task's kernel stack
+struct pt_regs* task_pt_regs(struct task_struct* tsk) {
+    // trap frame is stored at the top of the kernel stack
+    unsigned long p = (unsigned long)tsk->kernel_stack + THREAD_STACK_SIZE - sizeof(struct pt_regs);
+    return (struct pt_regs*)p;
+}
+
+int move_to_user_mode(unsigned long pc) {
+    disable_irq_in_el1();
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    struct pt_regs* regs = task_pt_regs(current);
+    
+    // Initialize the trap frame
+    memzero((unsigned long)regs, sizeof(*regs));
+    
+    // Debug user function address
+    muart_puts("User function address check:\r\n");
+    muart_puts("Function address: ");
+    muart_send_hex((unsigned int)pc);
+    muart_puts("\r\n");
+    
+    // (Optional) Verify function is accessible by reading a few bytes
+    // muart_puts("First bytes of function: ");
+    // unsigned char* func = (unsigned char*)pc;
+    // for (int i = 0; i < 8; i++) {
+    //     muart_send_hex(func[i]);
+    //     muart_puts(" ");
+    // }
+    // muart_puts("\r\n");
+    
+    // Set up initial processor state
+    regs->pc = pc;
+    regs->pstate = 0;  // EL0t (using SP_EL0) with interrupt enabled
+    
+
+
+    // Set stack pointer to top of user stack
+    regs->sp = (unsigned long)((char*)current->user_stack + THREAD_STACK_SIZE);
+    
+    
+    muart_puts("Moving to user mode, PC: ");
+    muart_send_hex((unsigned int)pc);
+    muart_puts(", SP: ");
+    muart_send_hex((unsigned int)regs->sp);
+    muart_puts(", PSTATE: ");
+    muart_send_hex((unsigned int)regs->pstate);
+    muart_puts("\r\n");
+    
+    enable_irq_in_el1();
+
+    asm(
+        "msr tpidr_el1, %0\n\t" // Hold the "kernel(el1)" thread structure information
+        "msr elr_el1, %1\n\t"   // When el0 -> el1, store return address for el1 -> el0
+        "msr sp_el0, %2\n\t"
+        "mov sp, %3\n\t"
+        "msr spsr_el1, xzr\n\t" // Enable interrupt in EL0 -> Used for thread scheduler
+        "eret\n\t" ::
+        "r"(&current->cpu_context),
+        "r"(pc), 
+        "r"(current->cpu_context.sp),
+        "r"(current->kernel_stack + THREAD_STACK_SIZE)
+    ); 
+
+    return 0;
+}
+
+void sys_get_pid_test() {
+    muart_puts("\r\nFork Test, pid ");
+    int pid = call_sys_getpid();
+    muart_send_dec(pid);
+    muart_puts("\r\n");
+
+    // user thread exit
+    call_sys_exit();
+}
+
+// Kernel thread function that will move to user mode
+void kernel_fork_process() {
+    muart_puts("Kernel process started. Preparing to move to user mode...\r\n");
+    int err = move_to_user_mode((unsigned long)&sys_get_pid_test);
+    if (err < 0) {
+        muart_puts("Error while moving process to user mode\r\n");
+    }
 }

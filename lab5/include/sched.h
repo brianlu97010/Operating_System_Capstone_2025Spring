@@ -12,6 +12,9 @@
 #define TASK_ZOMBIE     1
 #define TASK_DEAD       2
 
+/* Functions that thread needs to do */
+typedef void (*thread_func_t)(void *);
+
 /* CPU context structure */
 struct cpu_context {
     unsigned long x19;
@@ -35,19 +38,47 @@ struct task_struct {
     pid_t pid;
     int state;
     struct task_struct* parent;
-    void* stack;
+    void* kernel_stack;
+    void* user_stack;
     struct list_head list;    // For run queue
     struct list_head task;    // For task list
 };
 
-void sched_init(void);
-pid_t kernel_thread(void (*fn)(void*), void* arg);
-void schedule(void);
-void thread_exit(void);
-unsigned long get_current_thread(void);
 
-// External variables
+// External variables (defined in sched.c and will be used in other files) 
 extern struct list_head task_lists;
 extern struct list_head rq;
+
+
+/* Initialize the thread mechanism */
+void sched_init(void);
+
+/* 
+ * Create a new kernel thread: initialize the properties of the task struct and add it to the run queue
+ * Return the thread ID or -1 if fail   
+ */
+pid_t kernel_thread(void (*fn)(void*), void* arg);
+
+/* 
+ * Choose a thread to run 
+ * 目前 schedule() 只會在以下幾種情況被呼叫
+ * 1. Thread Voluntary Yielding CPU
+ * 2. Thread Exit (called in funtion `thread_exit()`)
+ */
+void schedule(void);
+
+/* When a thread exit, set the state to ZOMBIE and remove it from the run queue */
+void thread_exit(void);
+
+
+/* --- Function defined in sched.S --- */
+/* Jump to the address in x19, with the argument in x20 */
+void ret_from_kernel_thread();
+
+/* Switch from the prev thread to the next thread */
+void cpu_switch_to(struct task_struct* prev, struct task_struct* next);
+
+/* Get the current thread from the system register tpidr_el1 */
+unsigned long get_current_thread();
 
 #endif

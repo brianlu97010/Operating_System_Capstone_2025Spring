@@ -27,10 +27,12 @@ get_current_thread:
     mrs x0, tpidr_el1
     ret
 
+// Entry point for kernel threads
 .global ret_from_kernel_thread
 ret_from_kernel_thread:
     // x19 contains the function pointer
     // x20 contains the argument
+    bl enable_irq_in_el1
     mov x0, x20
     blr x19
     bl thread_exit
