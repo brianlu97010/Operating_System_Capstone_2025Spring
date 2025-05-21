@@ -20,7 +20,7 @@ void* simple_alloc(size_t size);
 #define PAGE_FLAG_USED 1    // Page frame is currently allocated
 
 /* Printlog message */
-#define LOG_MALLOC 0
+#define LOG_MALLOC 1
 
 /* Page descriptor: decribe properties of the page frame */
 typedef struct page_t{
@@ -99,6 +99,13 @@ void* dmalloc(size_t size);
  */
 void dfree(void* ptr);
 
+/**
+ * Set a block of memory to zero.
+ *
+ * @param src Pointer to the memory block to be zeroed
+ * @param n Number of bytes to set to zero
+ */
+void memzero(unsigned long src, unsigned long n);
 
 /* Demo */
 /* Memory area for buddy system */
