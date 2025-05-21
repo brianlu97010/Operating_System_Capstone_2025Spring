@@ -62,25 +62,6 @@ void svc_handler(){
             break;
         case 0:
             muart_puts("Exceptions with an unknown reason \r\n");
-            // Print additional diagnostic information
-            muart_puts("Current Exception Level: ");
-            unsigned long current_el = get_current_el();
-            muart_send_dec(current_el);
-            muart_puts("\r\n");
-            
-            // Check if we're in EL0
-            if (current_el == 0) {
-                muart_puts("Running in EL0\r\n");
-            } else {
-                muart_puts("Not in EL0\r\n");
-            }
-            
-            // Check CPU timer status
-            unsigned long cntkctl;
-            asm volatile("mrs %0, cntkctl_el1" : "=r"(cntkctl));
-            muart_puts("CNTKCTL_EL1: ");
-            muart_send_hex(cntkctl);
-            muart_puts("\r\n");
             break;
         default:
             muart_puts("other cause \r\n");
