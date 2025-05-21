@@ -6,28 +6,28 @@
 static pid_bitmap_t pid_bitmap;
 
 /**
- * 找到位圖中第一個為0的位元，從offset開始查找
+ * Find the first zero bit in the bitmap, starting from offset.
  * 
- * @param bitmap  位圖的基地址
- * @param size    位圖的總位元數
- * @param offset  開始搜索的位置
- * @return        找到的第一個為0的位元索引，若未找到則返回size
+ * @param bitmap  Base address of the bitmap
+ * @param size    Total number of bits in the bitmap
+ * @param offset  Start searching from this position
+ * @return        Index of the first zero bit found, or size if not found
  */
 unsigned int find_next_zero_bit(const unsigned long *bitmap, unsigned int size, unsigned int offset) {
-    // 如果偏移已經超出範圍，直接返回size
+    // If offset is out of range, return size directly
     if (offset >= size) {
         return size;
     }
     
-    // 計算起始元素和位偏移
+    // Calculate starting element and bit offset
     unsigned int word_offset = BIT_WORD(offset);
     unsigned int bit_offset = offset % BITS_PER_LONG;
     unsigned long word;
     
-    // 檢查當前元素中偏移之後的位
+    // Check bits after offset in the current element
     word = bitmap[word_offset] >> bit_offset;
     
-    // 如果當前字中在偏移之後有0位（也就是取反後有1位）
+    // If there is a zero bit after the offset in the current word (i.e., ~word has a 1 bit)
     if (~word != 0) {
         bit_offset += __builtin_ffsl(~word) - 1;
         if (bit_offset < BITS_PER_LONG && offset + bit_offset - (offset % BITS_PER_LONG) < size) {
@@ -35,14 +35,14 @@ unsigned int find_next_zero_bit(const unsigned long *bitmap, unsigned int size, 
         }
     }
     
-    // 檢查後續元素
+    // Check subsequent elements
     size -= (offset + (BITS_PER_LONG - bit_offset));
     word_offset++;
     
-    // 處理整個unsigned long的情況
+    // Handle full unsigned long words
     while (size >= BITS_PER_LONG) {
         if (bitmap[word_offset] != ~0UL) {
-            // 找到第一個為0的位
+            // Found the first zero bit
             bit_offset = __builtin_ffsl(~bitmap[word_offset]) - 1;
             return word_offset * BITS_PER_LONG + bit_offset;
         }
@@ -51,7 +51,7 @@ unsigned int find_next_zero_bit(const unsigned long *bitmap, unsigned int size, 
         size -= BITS_PER_LONG;
     }
     
-    // 處理剩餘的不足一個unsigned long的位
+    // Handle the remaining bits less than one unsigned long
     if (size > 0) {
         word = bitmap[word_offset];
         if (word != ~0UL) {
@@ -62,7 +62,7 @@ unsigned int find_next_zero_bit(const unsigned long *bitmap, unsigned int size, 
         }
     }
     
-    // 如果在往後找不到，從頭開始找（環形搜索）
+    // If not found, search from the beginning (circular search)
     word_offset = BIT_WORD(MIN_PID);
     unsigned int search_limit = BIT_WORD(offset);
     
@@ -73,35 +73,35 @@ unsigned int find_next_zero_bit(const unsigned long *bitmap, unsigned int size, 
         }
     }
     
-    // 未找到為0的位
+    // No zero bit found
     return size;
 }
 
 /**
- * 找到位圖中第一個為0的位元
+ * Find the first zero bit in the bitmap
  * 
- * @param bitmap  位圖的基地址
- * @param size    位圖的總位元數
- * @return        找到的第一個為0的位元索引，若未找到則返回size
+ * @param bitmap  Base address of the bitmap
+ * @param size    Total number of bits in the bitmap
+ * @return        Index of the first zero bit found, or size if not found
  */
 unsigned int find_first_zero_bit(const unsigned long *bitmap, unsigned int size) {
     return find_next_zero_bit(bitmap, size, MIN_PID);
 }
 
 /**
- * 初始化 PID 位元圖
+ * Initialize the PID bitmap
  */
 void pid_bitmap_init(void) {
-    // 清空整個位元圖
+    // Clear the entire bitmap
     for (int i = 0; i < BITS_TO_LONGS(MAX_PID + 1); i++) {
         pid_bitmap.pid_bitmap[i] = 0;
     }
     
-    // 保留PID 0和1
-    set_bit(0, pid_bitmap.pid_bitmap); // 保留給idle task
-    set_bit(1, pid_bitmap.pid_bitmap); // 保留給init task
+    // Reserve PID 0 and 1
+    set_bit(0, pid_bitmap.pid_bitmap); // Reserved for idle task
+    set_bit(1, pid_bitmap.pid_bitmap); // Reserved for init task
     
-    // 設置last_pid
+    // Set last_pid
     pid_bitmap.last_pid = 1;
     
     muart_puts("PID bitmap initialized, PIDs range from ");
@@ -112,33 +112,33 @@ void pid_bitmap_init(void) {
 }
 
 /**
- * 分配一個新的PID
+ * Allocate a new PID
  * 
- * @return        分配的PID，若失敗則返回-1
+ * @return        Allocated PID, or -1 on failure
  */
 pid_t pid_alloc(void) {
-    // 從上次分配的PID之後開始搜索
+    // Start searching from the PID after the last allocated one
     int offset = pid_bitmap.last_pid + 1;
     if (offset > MAX_PID) {
-        offset = MIN_PID;  // 回環到最小可用PID值
+        offset = MIN_PID;  // Wrap around to the minimum available PID
     }
     
-    // 查找下一個可用PID
+    // Find the next available PID
     int pid = find_next_zero_bit(pid_bitmap.pid_bitmap, MAX_PID + 1, offset);
     
-    // 檢查找到的PID是否有效
+    // Check if the found PID is valid
     if (pid < MIN_PID || pid > MAX_PID) {
-        // 如果沒找到或無效，從最小PID開始重新查找
+        // If not found or invalid, search again from the minimum PID
         pid = find_next_zero_bit(pid_bitmap.pid_bitmap, MAX_PID + 1, MIN_PID);
         
-        // 再次檢查
+        // Check again
         if (pid < MIN_PID || pid > MAX_PID) {
             muart_puts("Error: No free PID available\r\n");
             return -1;
         }
     }
     
-    // 標記PID為已分配
+    // Mark the PID as allocated
     set_bit(pid, pid_bitmap.pid_bitmap);
     pid_bitmap.last_pid = pid;
     
@@ -146,12 +146,12 @@ pid_t pid_alloc(void) {
 }
 
 /**
- * 釋放一個已分配的PID
+ * Free an allocated PID
  * 
- * @param pid     要釋放的PID
+ * @param pid     PID to free
  */
 void pid_free(pid_t pid) {
-    // 檢查PID是否有效且已分配
+    // Check if the PID is valid and allocated
     if (pid < MIN_PID || pid > MAX_PID) {
         muart_puts("Error: Attempted to free invalid PID ");
         muart_send_dec(pid);
@@ -166,6 +166,6 @@ void pid_free(pid_t pid) {
         return;
     }
     
-    // 釋放PID
+    // Free the PID
     clear_bit(pid, pid_bitmap.pid_bitmap);
 } 
