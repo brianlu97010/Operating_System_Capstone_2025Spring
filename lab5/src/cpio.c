@@ -49,6 +49,7 @@ unsigned int cpio_hex_to_int(const char* hex, unsigned int len){
 }
 
 /* List all files in the CPIO archive */
+/* List all files in the CPIO archive */
 void cpio_ls(const void* cpio_file_addr){
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;
@@ -62,7 +63,7 @@ void cpio_ls(const void* cpio_file_addr){
         // Get the filedata size from the header and convert it to unsigned int
         unsigned int filedata_size = cpio_hex_to_int(header->c_filesize, 8);
 
-        // Get the pathname which is followed by the header (the total size of header is sizeof(cpio_newc_header) bytes)
+        // Get the pathname which is followed by the header
         const char *pathname = current_addr + sizeof(cpio_newc_header);
 
         // Check if reached the trailer
@@ -75,7 +76,15 @@ void cpio_ls(const void* cpio_file_addr){
         muart_puts("\r\n");
 
         // Move to the next entry
-        current_addr = current_addr + sizeof(cpio_newc_header) + pathname_size + cpio_padded_size(filedata_size);
+        // 1. 計算 data 起始位置（相對於 header 起始位置對齊）
+        unsigned long data_start = (unsigned long)current_addr + sizeof(cpio_newc_header) + pathname_size;
+        data_start = cpio_padded_size(data_start);  // 4-byte align
+        
+        // 2. 計算下一個 header 位置（相對於 data 起始位置對齊）
+        unsigned long next_header = data_start + filedata_size;
+        next_header = cpio_padded_size(next_header); // 4-byte align
+
+        current_addr = (const char*)next_header;
     }
     return;
 }
