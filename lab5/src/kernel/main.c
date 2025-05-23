@@ -13,6 +13,27 @@ buddy_system_t buddy;
 /* Page array for buddy system */
 page_t page_array[BUDDY_MEM_SIZE / PAGE_SIZE];
 
+extern void kernel_fork_process();
+
+int syscall_test() {
+    muart_puts("Starting fork test...\r\n");
+    
+    // Create a kernel thread that will move to user mode
+    pid_t pid = kernel_thread(kernel_fork_process, NULL);
+    if (pid < 0) {
+        muart_puts("Error: Failed to create kernel thread\r\n");
+        return -1;
+    }
+    
+    muart_puts("Created kernel thread with PID: ");
+    muart_send_dec(pid);
+    muart_puts("\r\n");
+    
+    schedule();
+    
+    return 0;
+}
+
 void main(void* fdt){    
     // Initialize mini UART
     muart_init();
@@ -54,6 +75,9 @@ void main(void* fdt){
     memory_pools_init();
     muart_puts("Dynamic allocator initialized successful !\r\n");
 
+    // Initialize the scheduler
+    sched_init();
+
     // Demo of the dynamic allocator
     // dynamic_allocator_demo();
 
@@ -61,6 +85,9 @@ void main(void* fdt){
     // muart_puts("\r\n=== Starting Thread Test ===\r\n");
     // thread_test();
     // muart_puts("=== Thread Test Completed ===\r\n");
+
+    // syscall test
+    syscall_test();
 
     // Start Simple Shell
     shell();

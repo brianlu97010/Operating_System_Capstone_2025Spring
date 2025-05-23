@@ -3,8 +3,18 @@
 
 
 #define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
+#define TRAP_FRAME_SIZE      272            // Size of trap frame
 
 #ifndef __ASSEMBLER__
+
+// Trap frame
+struct trap_frame {
+    unsigned long regs[31];  // General purpose registers x0-x30
+    unsigned long sp;        // Stack pointer
+    unsigned long pc;        // Program counter
+    unsigned long pstate;    // Processor state
+};
+
 /* --- C functions --- */
 /* The API to initialize the exception vector table */
 void exception_table_init(void);

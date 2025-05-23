@@ -18,6 +18,12 @@ void core_timer_init() {
         "lsr x0, x0, #5\n\t"      // Shift right by 5 bits
         "msr cntp_tval_el0, x0\n\t" // Set CNTP_TVAL_EL0 for next timer interrupt
     );
+
+    // Let the user program in EL0 can directly access the frequency register and physical counter register in EL1 
+    unsigned long tmp;
+    asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
+    tmp |= 1;
+    asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
 }
 
 

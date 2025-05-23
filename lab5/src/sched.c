@@ -338,25 +338,18 @@ void thread_test(){
 }
 
 /* Basic Exercise 2 */
-// Trap frame
-struct pt_regs {
-    unsigned long regs[31];  // General purpose registers x0-x30
-    unsigned long sp;        // Stack pointer
-    unsigned long pc;        // Program counter
-    unsigned long pstate;    // Processor state
-};
-
-// Get pointer to pt_regs at the top of a task's kernel stack
-struct pt_regs* task_pt_regs(struct task_struct* tsk) {
+// 等下要把 strcut trap_frame 的 data 放到 task's 的 kernel stack 的最上層
+// Get pointer to trap_frame at the top of a task's kernel stack
+struct trap_frame* task_pt_regs(struct task_struct* tsk) {
     // trap frame is stored at the top of the kernel stack
-    unsigned long p = (unsigned long)tsk->kernel_stack + THREAD_STACK_SIZE - sizeof(struct pt_regs);
-    return (struct pt_regs*)p;
+    unsigned long p = (unsigned long)((char*)tsk->kernel_stack + THREAD_STACK_SIZE - TRAP_FRAME_SIZE);
+    return (struct trap_frame*)p;
 }
 
-int move_to_user_mode(unsigned long pc) {
+int move_to_user_mode(unsigned long user_program_addr) {
     disable_irq_in_el1();
     struct task_struct* current = (struct task_struct*)get_current_thread();
-    struct pt_regs* regs = task_pt_regs(current);
+    struct trap_frame* regs = task_pt_regs(current);
     
     // Initialize the trap frame
     memzero((unsigned long)regs, sizeof(*regs));
@@ -364,7 +357,7 @@ int move_to_user_mode(unsigned long pc) {
     // Debug user function address
     muart_puts("User function address check:\r\n");
     muart_puts("Function address: ");
-    muart_send_hex((unsigned int)pc);
+    muart_send_hex((unsigned int)user_program_addr);
     muart_puts("\r\n");
     
     // (Optional) Verify function is accessible by reading a few bytes
@@ -376,36 +369,17 @@ int move_to_user_mode(unsigned long pc) {
     // }
     // muart_puts("\r\n");
     
-    // Set up initial processor state
-    regs->pc = pc;
-    regs->pstate = 0;  // EL0t (using SP_EL0) with interrupt enabled
-    
 
-
-    // Set stack pointer to top of user stack
-    regs->sp = (unsigned long)((char*)current->user_stack + THREAD_STACK_SIZE);
-    
-    
-    muart_puts("Moving to user mode, PC: ");
-    muart_send_hex((unsigned int)pc);
-    muart_puts(", SP: ");
-    muart_send_hex((unsigned int)regs->sp);
-    muart_puts(", PSTATE: ");
-    muart_send_hex((unsigned int)regs->pstate);
-    muart_puts("\r\n");
-    
-    enable_irq_in_el1();
-
-    asm(
+    __asm__(
         "msr tpidr_el1, %0\n\t" // Hold the "kernel(el1)" thread structure information
-        "msr elr_el1, %1\n\t"   // When el0 -> el1, store return address for el1 -> el0
+        "msr elr_el1, %1\n\t"   // Store the user function address into elr_el1
         "msr sp_el0, %2\n\t"
-        "mov sp, %3\n\t"
-        "msr spsr_el1, xzr\n\t" // Enable interrupt in EL0 -> Used for thread scheduler
-        "eret\n\t" ::
-        "r"(&current->cpu_context),
-        "r"(pc), 
-        "r"(current->cpu_context.sp),
+        "mov sp, %3\n\t"        // stack pointer set to the top of the task's kernel stack
+        "msr spsr_el1, xzr\n\t"   // Enable interrupt in EL0 and use user's stack pointer
+        "eret\n\t" ::           // Switch to EL0, jump to elr_el1 (user program address)
+        "r"(current),
+        "r"(user_program_addr), 
+        "r"(current->user_stack + THREAD_STACK_SIZE),
         "r"(current->kernel_stack + THREAD_STACK_SIZE)
     ); 
 
@@ -424,6 +398,9 @@ void sys_get_pid_test() {
 
 // Kernel thread function that will move to user mode
 void kernel_fork_process() {
+    muart_puts("Kernel process executing at EL ");
+    muart_send_dec(get_current_el());
+    muart_puts("\r\n");
     muart_puts("Kernel process started. Preparing to move to user mode...\r\n");
     int err = move_to_user_mode((unsigned long)&sys_get_pid_test);
     if (err < 0) {

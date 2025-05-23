@@ -115,11 +115,16 @@ static int cmd_exec_prog(int argc, char* argv[]){
     }
     
     // Set core timer expired time to 2 secs
-    set_core_timer();
+    // set_core_timer();    
+
     // Enable the timer interrupt of the first level interrupt controller 
     enable_core_timer_int();
     
-    muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
+    // muart_puts("Timer interrupts enabled. Will print time every 2 seconds when in EL0.\r\n");
+    
+    muart_puts("Executing user program: ");
+    muart_puts(argv[1]);
+    muart_puts("\r\n");
     
     // Get the initramfs address
     void* initramfs_addr = get_cpio_addr();
