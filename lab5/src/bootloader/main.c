@@ -8,7 +8,7 @@ void bootloader_main(void* fdt_addr){
     
     muart_puts("Hello from the bootloader ! \r\n");
     muart_puts("bootloader main function is relocated at ");
-    muart_send_hex((unsigned int)bootloader_main);
+    muart_send_hex((unsigned long)bootloader_main);
     muart_puts("\r\n");
     muart_puts("Waiting for kernel transmiting ... \r\n");
 

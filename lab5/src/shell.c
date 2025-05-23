@@ -8,6 +8,7 @@
 #include "malloc.h"
 #include "types.h"
 #include "timer.h"
+#include "async_uart.h"
 
 // Declaration of command
 static int cmd_help(int argc, char* argv[]);
@@ -68,13 +69,13 @@ static int cmd_mailbox(int argc, char* argv[]){
 }
 
 static int cmd_ls(int argc, char* argv[]){
-    void* initranfs_addr = get_cpio_addr();
+    const void* initranfs_addr = get_cpio_addr();
     cpio_ls(initranfs_addr);
     return 0;
 }
 
 static int cmd_cat(int argc, char* argv[]){
-    void* initranfs_addr = get_cpio_addr();
+    const void* initranfs_addr = get_cpio_addr();
     if(argc < 2){
         muart_puts("Usage: cat <filename>\r\n");
         return -1;
@@ -99,7 +100,7 @@ static int cmd_memAlloc(int argc, char* argv[]){
     // Check the results
     if(mem){
         muart_puts("Allocated memory at: ");
-        muart_send_hex((unsigned int)mem);
+        muart_send_hex((unsigned long)mem);
         muart_puts("\r\n");
     }
     else{
@@ -127,7 +128,7 @@ static int cmd_exec_prog(int argc, char* argv[]){
     muart_puts("\r\n");
     
     // Get the initramfs address
-    void* initramfs_addr = get_cpio_addr();
+    const void* initramfs_addr = get_cpio_addr();
     
     // Execute the user program from the initramfs
     cpio_exec(initramfs_addr, argv[1]);

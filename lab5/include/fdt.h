@@ -30,9 +30,6 @@ typedef struct initramfs_context_t{
 // return 1 -> continue iterate)  return 0 -> (stop iterate)
 typedef int (*fdt_callback_t)(const void *fdt, const void *node_ptr, const char *node_name, int depth, void *data);
 
-/* Convert big-endian 32-bit value to little-endian 32-bit value */
-static inline unsigned int be_to_le32(unsigned int be32_val);
-
 /* Traverse the device tree and call the callback function for each node */
 void fdt_traverse(const void* fdt, fdt_callback_t callback_func, void* data);
 

@@ -4,6 +4,7 @@
 #include "registers.h"
 #include "timer.h"
 #include "syscall.h"
+#include "async_uart.h"
 
 /* The API to initialize the exception vector table */
 void exception_table_init(){

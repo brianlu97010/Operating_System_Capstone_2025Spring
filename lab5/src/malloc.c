@@ -560,13 +560,13 @@ static void allocate_page_for_pool(int pool_idx){
 // Get the memory pool index from the chunk address
 static int get_pool_index_from_address(void* addr) {
     // Align down to the page boundary, calculating the starting address of the page containing the given address
-    unsigned int page_addr = (unsigned int)addr & ~(PAGE_SIZE - 1);
+    unsigned long page_addr = (unsigned long)addr & ~(PAGE_SIZE - 1);
     
 
     // Iterates through the memory pools to find the index of the pool whose page address matches the given page address.
     for (int i = 0; i < CHUNK_SIZES_COUNT; i++) {
         if (memory_pools[i].page_address && 
-            (unsigned int)memory_pools[i].page_address == page_addr) {
+            (unsigned long)memory_pools[i].page_address == page_addr) {
             return i;
         }
     }
@@ -694,7 +694,7 @@ void dfree(void* ptr){
     #endif
     
     // Check if the address is page-aligned (large allocation)
-    if ((unsigned int)ptr % PAGE_SIZE == 0){
+    if ((unsigned long)ptr % PAGE_SIZE == 0){
         // Check if the address is belong to some memory pools
         for (int i = 0; i < CHUNK_SIZES_COUNT; i++){
             if (memory_pools[i].page_address == ptr){

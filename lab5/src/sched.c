@@ -23,9 +23,6 @@
 // Use doubly-linked list to maintain all tasks
 struct list_head task_lists;
 
-// PID bitmap for managing PIDs
-static pid_bitmap_t pid_bitmap;
-
 // Use a doubly-linked list to maintain the run queue
 struct list_head rq;
 

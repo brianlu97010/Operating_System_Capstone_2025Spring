@@ -153,7 +153,6 @@ void async_uart_example(){
     // Buffer for the reading data
     char buffer[64] = {0};
     int i = 0;
-    char c = '0';
     
     // Welcome message
     async_uart_puts("Async UART Example - Type something and press Enter, Type 'exit' for exit this example\r\n");
@@ -161,7 +160,7 @@ void async_uart_example(){
     while (1) {
         // Check whether the RX buffer has data, if no data, then continue executing next instruction
         if ( rx_head != rx_tail ){
-            char c;
+            char c = '0';
             if( async_uart_read(&c, 1) > 0 ){   // Read the receive buffer and store into a temp char
                 // Echo the character
                 async_uart_write(&c, 1);

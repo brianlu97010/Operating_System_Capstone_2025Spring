@@ -3,7 +3,7 @@
 #include "string.h"
 #include "exception.h"
 
-static unsigned int initramfs_address = 0x20000000;
+static unsigned long initramfs_address = 0x20000000;
 
 /* The API for other modules set the initramfs_address */
 void set_initramfs_address(unsigned int addr) {
@@ -82,7 +82,7 @@ void cpio_ls(const void* cpio_file_addr){
 
 /* Print the file data in the CPIO archive */
 void cpio_cat(const void* cpio_file_addr, const char* file_name){
-    const char* current_addr = (const char*)cpio_file_addr;
+    char* current_addr = (char*)cpio_file_addr;
     cpio_newc_header* header;
     char* file_data;
 
@@ -96,7 +96,7 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
         unsigned int filedata_size = cpio_hex_to_int(header->c_filesize, 8);
 
         // Get the pathname which is followed by the header (the total size of header is sizeof(cpio_newc_header) bytes)
-        const char *pathname = current_addr + sizeof(cpio_newc_header);
+        char *pathname = current_addr + sizeof(cpio_newc_header);
 
         // Check if reached the trailer
         if( strcmp(pathname, CPIO_TRAILER) == 0 ) {
@@ -126,7 +126,6 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
 void cpio_exec(const void* cpio_file_addr, const char* file_name){
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;
-    const char* file_data;
     void* program_start_addr = NULL;
 
     while(1){
@@ -171,7 +170,7 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
     muart_puts("\r\n");
     
     muart_puts("Program address: ");
-    muart_send_hex((unsigned int)program_start_addr);
+    muart_send_hex((unsigned long)program_start_addr);
     muart_puts("\r\n");
     
     // Switch to EL0 and executre the user program

@@ -118,6 +118,7 @@ const void* fdt_get_property(const void* fdt, const void* node_ptr, const char* 
         // Advance to next token
         struct_ptr = (const unsigned int*)((const char*)struct_ptr + ((len + 3) & ~3));    // padding 0x0 to aligned on a 32-bit boundary
     }
+    return NULL;   // Not found
 }
 
 /* Callback function to find the initramfs address in traversing device tree */

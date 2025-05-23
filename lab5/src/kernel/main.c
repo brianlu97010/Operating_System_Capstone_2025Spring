@@ -40,11 +40,11 @@ void main(void* fdt){
 
     // Print the dtb loading address
     muart_puts("Kernel : flatten device tree address is at ");
-    muart_send_hex(((unsigned int)fdt));
+    muart_send_hex(((unsigned long)fdt));
     muart_puts("\r\n");
 
     // Get the initramfs address from the device tree
-    unsigned int initramfs_addr = get_initramfs_address(fdt);
+    unsigned long initramfs_addr = get_initramfs_address(fdt);
     if (initramfs_addr == 1) {
         muart_puts("Error: Failed to get initramfs address from device tree\r\n");
         return;
