@@ -40,8 +40,16 @@ struct task_struct {
     struct task_struct* parent;
     void* kernel_stack;
     void* user_stack;
+    void* user_program;           // Pointer to allocated user program memory
+    size_t user_program_size;     // Size of user program for cleanup
     struct list_head list;    // For run queue
     struct list_head task;    // For task list
+};
+
+/* Pass initramfs address through task structure */
+struct task_init_data {
+    const char* filename;
+    unsigned long initramfs_addr;
 };
 
 

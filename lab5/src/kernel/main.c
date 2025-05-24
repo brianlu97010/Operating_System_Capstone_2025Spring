@@ -13,14 +13,29 @@ buddy_system_t buddy;
 /* Page array for buddy system */
 page_t page_array[BUDDY_MEM_SIZE / PAGE_SIZE];
 
-extern void kernel_fork_process();
+// extern void kernel_fork_process();
+extern void kernel_fork_process_cpio();
 
-int syscall_test() {
-    muart_puts("Starting fork test...\r\n");
+int video_player_test(void* fdt) {
+    muart_puts("Starting system call test with initramfs.cpio program ...\r\n");
     
     // Create a kernel thread that will move to user mode
-    pid_t pid = kernel_thread(kernel_fork_process, NULL);
+    // pid_t pid = kernel_thread(kernel_fork_process, NULL);
+
+    // Create initialization data
+    struct task_init_data* init_data = (struct task_init_data*)dmalloc(sizeof(struct task_init_data));
+    if (!init_data) {
+        muart_puts("Error: Failed to allocate init data\r\n");
+        return -1;
+    }
+    
+    init_data->filename = "syscall.img";
+    init_data->initramfs_addr = get_initramfs_address(fdt);
+    
+    // Create a kernel thread that will load and execute syscall.img
+    pid_t pid = kernel_thread(kernel_fork_process_cpio, init_data);
     if (pid < 0) {
+        dfree(init_data);
         muart_puts("Error: Failed to create kernel thread\r\n");
         return -1;
     }
@@ -87,7 +102,7 @@ void main(void* fdt){
     // muart_puts("=== Thread Test Completed ===\r\n");
 
     // syscall test
-    syscall_test();
+    video_player_test(fdt);
 
     // Start Simple Shell
     shell();

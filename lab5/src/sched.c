@@ -78,6 +78,10 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
         return -1;
     }
 
+    // Initialize user program fields
+    new_task->user_program = NULL;        // Will be set by cpio_load_program
+    new_task->user_program_size = 0;      // Will be set by cpio_load_program
+
     // Set the cpu context of new task
     new_task->cpu_context.sp = (unsigned long)((char*)new_task->kernel_stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's kernel stack
     new_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                                       // Set the link register store the address of ret_from_kernel_thread
@@ -224,7 +228,20 @@ void idle_task_fn(){
                 if (zombie->user_stack) {
                     dfree(zombie->user_stack);
                 }
+
+                // Free the zombie task's user program memory
+                if (zombie->user_program) {
+                    muart_puts("  Freeing user program (size: ");
+                    muart_send_dec(zombie->user_program_size);
+                    muart_puts(" bytes)\r\n");
+                    dfree(zombie->user_program);
+                    zombie->user_program = NULL;
+                    zombie->user_program_size = 0;
+                }
                 
+                // Free the zombie task's pid
+                pid_free(zombie->pid);
+
                 // Mark the state of dead
                 zombie->state = TASK_DEAD;
                 
@@ -271,6 +288,10 @@ static void create_idle_task(){
     idle_task->parent = NULL;
     idle_task->state = TASK_RUNNING;
     
+    // Initialize user program fields for idle task (not used, but for consistency)
+    idle_task->user_program = NULL;
+    idle_task->user_program_size = 0;
+
     // Set the cpu context of idle task
     idle_task->cpu_context.sp = (unsigned long)((char*)idle_task->kernel_stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's kernel stack
     idle_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                                        // Set the link register store the address of ret_from_kernel_thread
@@ -389,6 +410,22 @@ void sys_get_pid_test() {
     muart_send_dec(pid);
     muart_puts("\r\n");
 
+    // Test the UART system call
+    char write_buf[] = "Hello, UART!\n";
+    char read_buf[64];
+    
+    // Test write
+    size_t written = call_sys_uartwrite(write_buf, sizeof(write_buf) - 1);
+    
+    // Test read (this will block waiting for input)
+    call_sys_uartwrite("Enter some text: ", 17);
+    size_t read_count = call_sys_uartread(read_buf, 10);    // Read up to 10 bytes, it must enter 10 characters to exit (just for test)
+    
+    // Echo back what was read
+    call_sys_uartwrite("You entered: ", 13);
+    call_sys_uartwrite(read_buf, read_count);
+    call_sys_uartwrite("\n", 1);
+
     // user thread exit
     call_sys_exit();
 }
@@ -400,6 +437,48 @@ void kernel_fork_process() {
     muart_puts("\r\n");
     muart_puts("Kernel process started. Preparing to move to user mode...\r\n");
     int err = move_to_user_mode((unsigned long)&sys_get_pid_test);
+    if (err < 0) {
+        muart_puts("Error while moving process to user mode\r\n");
+    }
+}
+
+/* Create a kernel thread execute `syscall.img` in EL0 */
+
+// Modified kernel thread function that uses cpio_exec approach
+void kernel_fork_process_cpio(void* arg) {
+    struct task_init_data* init_data = (struct task_init_data*)arg;
+    if (!init_data) {
+        muart_puts("Error: No initialization data provided\r\n");
+        return;
+    }
+    
+    muart_puts("Kernel process executing at EL ");
+    muart_send_dec(get_current_el());
+    muart_puts("\r\n");
+    muart_puts("Loading ");
+    muart_puts(init_data->filename);
+    muart_puts(" from initramfs at ");
+    muart_send_hex(init_data->initramfs_addr);
+    muart_puts("\r\n");
+    
+    // Load program using provided initramfs address
+    unsigned long user_program_addr = cpio_load_program((void*)init_data->initramfs_addr, init_data->filename);
+    
+    // Free initialization data
+    dfree(init_data);
+    
+    if (user_program_addr == 0) {
+        muart_puts("Error: Failed to load program from initramfs\r\n");
+        call_sys_exit();
+        return;
+    }
+    
+    muart_puts("Successfully loaded program at address: ");
+    muart_send_hex((unsigned int)user_program_addr);
+    muart_puts("\r\n");
+    
+    // Move to user mode
+    int err = move_to_user_mode(user_program_addr);
     if (err < 0) {
         muart_puts("Error while moving process to user mode\r\n");
     }

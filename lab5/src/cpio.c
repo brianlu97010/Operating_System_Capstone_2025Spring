@@ -2,6 +2,7 @@
 #include "muart.h"
 #include "string.h"
 #include "exception.h"
+#include "sched.h"
 
 static unsigned long initramfs_address = 0x20000000;
 
@@ -138,6 +139,8 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
     return;
 }
 
+#define USER_PROGRAM_BASE   0x01000000    // 16MB - safe static area
+
 /* Execute the user program in initramfs in EL0 */
 void cpio_exec(const void* cpio_file_addr, const char* file_name){
     const char* current_addr = (const char*)cpio_file_addr;
@@ -200,4 +203,92 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
     // Switch to EL0 and executre the user program
     exec_user_program(program_start_addr);
     return;
+}
+
+// Modified version of your cpio_exec that returns program address instead of executing directly
+unsigned long cpio_load_program(const void* cpio_file_addr, const char* file_name) {
+    const char* current_addr = (const char*)cpio_file_addr;
+    cpio_newc_header* header;
+    void* program_start_addr = NULL;
+    unsigned int program_size = 0;
+
+    while(1){
+        header = (cpio_newc_header*)current_addr; 
+
+        // Get the pathname size from the header and convert it to unsigned int
+        unsigned int pathname_size = cpio_hex_to_int(header->c_namesize, 8);
+
+        // Get the filedata size from the header and convert it to unsigned int
+        unsigned int filedata_size = cpio_hex_to_int(header->c_filesize, 8);
+
+        // Get the pathname which is followed by the header
+        const char *pathname = current_addr + sizeof(cpio_newc_header);
+
+        // Check if reached the trailer
+        if( strcmp(pathname, CPIO_TRAILER) == 0 ){
+            break;
+        }
+        
+        // Store the file information
+        if( strcmp(file_name, pathname) == 0 ){
+            // Calculate the start address where file data starts
+            unsigned long data_start = (unsigned long)current_addr + sizeof(cpio_newc_header) + pathname_size;
+            data_start = cpio_padded_size(data_start);  // 4-byte align
+            program_start_addr = (void*)data_start;
+            program_size = filedata_size;
+            break;
+        }
+
+        // Move to the next entry
+        // Calculate data start position (aligned relative to header start position)
+        unsigned long data_start = (unsigned long)current_addr + sizeof(cpio_newc_header) + pathname_size;
+        data_start = cpio_padded_size(data_start);  // 4-byte align
+        
+        // Calculate next header position (aligned relative to data start position)
+        unsigned long next_header = data_start + filedata_size;
+        next_header = cpio_padded_size(next_header); // 4-byte align
+
+        current_addr = (const char*)next_header;
+    }
+
+    // Check if found the file
+    if(program_start_addr == NULL){
+        muart_puts("Error: File not found: ");
+        muart_puts(file_name);
+        muart_puts("\r\n");
+        return 0;
+    }
+    
+    // Print the file information if found
+    muart_puts("Found program: ");
+    muart_puts(file_name);
+    muart_puts(", size: ");
+    muart_send_dec(program_size);
+    muart_puts(" bytes\r\n");
+    
+    muart_puts("Program address in initramfs: ");
+    muart_send_hex((unsigned long)program_start_addr);
+    muart_puts("\r\n");
+    
+    // Get current task to allocate memory for user program
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    
+    // Allocate memory for user program (copy to separate memory space)
+    current->user_program = dmalloc(program_size);
+    if (!current->user_program) {
+        muart_puts("Error: Failed to allocate memory for user program\r\n");
+        return 0;
+    }
+    
+    // Store program size for cleanup later
+    current->user_program_size = program_size;
+    
+    // Copy program from initramfs to allocated memory
+    memcpy(current->user_program, program_start_addr, program_size);
+    
+    muart_puts("Copied program to allocated memory at: ");
+    muart_send_hex((unsigned long)current->user_program);
+    muart_puts("\r\n");
+    
+    return (unsigned long)current->user_program;
 }
