@@ -24,7 +24,7 @@ size_t sys_uartwrite(const char buf[], size_t size);
 int sys_exec(const char* name, char *const argv[]);
 int sys_fork(void);
 void sys_exit(void);
-int sys_mbox_call(unsigned char ch, unsigned int *mbox);
+int sys_mbox_call(unsigned int ch, unsigned int *mbox);
 void sys_kill(int pid);
 
 /* System call handler */

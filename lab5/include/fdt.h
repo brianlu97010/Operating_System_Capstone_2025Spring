@@ -40,6 +40,6 @@ const void* fdt_get_property(const void* fdt, const void* node_ptr, const char* 
 int initramfs_callback(const void *fdt, const void *node_ptr, const char *node_name, int depth, void *data);
 
 /* The API for getting the initramfs address from the device tree, return the address of initramfs */
-unsigned int get_initramfs_address(const void* fdt);
+unsigned long get_initramfs_address(const void* fdt);
 
 #endif

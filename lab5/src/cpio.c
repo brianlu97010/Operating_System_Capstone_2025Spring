@@ -3,6 +3,8 @@
 #include "string.h"
 #include "exception.h"
 #include "sched.h"
+#include "malloc.h"
+#include "mm.h"
 
 static unsigned long initramfs_address = 0x20000000;
 
@@ -131,15 +133,13 @@ void cpio_cat(const void* cpio_file_addr, const char* file_name){
         unsigned long next_header = data_start + filedata_size;
         next_header = cpio_padded_size(next_header); // 4-byte align
 
-        current_addr = (const char*)next_header;
+        current_addr = (char*)next_header;
     }
     muart_puts("File not found: ");
     muart_puts(file_name);
     muart_puts("\r\n");
     return;
 }
-
-#define USER_PROGRAM_BASE   0x01000000    // 16MB - safe static area
 
 /* Execute the user program in initramfs in EL0 */
 void cpio_exec(const void* cpio_file_addr, const char* file_name){
@@ -180,7 +180,7 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
         unsigned long next_header = data_start + filedata_size;
         next_header = cpio_padded_size(next_header); // 4-byte align
 
-        current_addr = (const char*)next_header;
+        current_addr = (char*)next_header;
     }
 
     // Check if found the file
@@ -205,7 +205,7 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
     return;
 }
 
-// Modified version of your cpio_exec that returns program address instead of executing directly
+// Load the user program from initramfs and copy it to the task's user space
 unsigned long cpio_load_program(const void* cpio_file_addr, const char* file_name) {
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;

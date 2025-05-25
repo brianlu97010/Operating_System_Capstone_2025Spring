@@ -9,10 +9,10 @@
 
 // Trap frame
 struct trap_frame {
-    unsigned long regs[31];  // General purpose registers x0-x30
-    unsigned long sp;        // Stack pointer
-    unsigned long pc;        // Program counter
-    unsigned long pstate;    // Processor state
+    unsigned long regs[31];     // General purpose registers x0-x30
+    unsigned long sp_el0;       // Stack pointer
+    unsigned long elr_el1;      // Program counter
+    unsigned long spsr_el1;     // Processor state
 };
 
 /* --- C functions --- */

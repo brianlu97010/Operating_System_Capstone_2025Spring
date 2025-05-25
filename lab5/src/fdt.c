@@ -143,7 +143,7 @@ int initramfs_callback(const void *fdt, const void *node_ptr, const char *node_n
 }
 
 /* The API for getting the initramfs address from the device tree, return the address of initramfs */
-unsigned int get_initramfs_address(const void* fdt){
+unsigned long get_initramfs_address(const void* fdt){
     // Initialize the context in initramfs
     muart_puts("Initializing the context in initramfs ! \r\n");
     initramfs_context_t initramfs_cxt;

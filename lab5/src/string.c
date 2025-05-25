@@ -75,15 +75,6 @@ char* strncpy(char* dest, const char* src, size_t n){
     return dest;
 }
 
-void* memcpy(void* dest, const void* src, size_t n) {
-    char* d = (char*)dest;
-    const char* s = (const char*)src;
-    while (n--) {
-        *d++ = *s++;
-    }
-    return dest;
-}
-
 /**
  * Compares at most the first n bytes of str1 and str2.
  * 

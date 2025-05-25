@@ -13,8 +13,28 @@ buddy_system_t buddy;
 /* Page array for buddy system */
 page_t page_array[BUDDY_MEM_SIZE / PAGE_SIZE];
 
-// extern void kernel_fork_process();
-extern void kernel_fork_process_cpio();
+extern void kernel_fork_process();
+extern void kernel_fork_process_cpio(void*);
+
+int syscall_test(){
+    muart_puts("Starting system call test ...\r\n");
+    
+    // Create a kernel thread that will move to user mode
+    pid_t pid = kernel_thread(kernel_fork_process, NULL);
+
+    if (pid < 0) {
+        muart_puts("Error: Failed to create kernel thread\r\n");
+        return -1;
+    }
+    
+    muart_puts("Created kernel thread with PID: ");
+    muart_send_dec(pid);
+    muart_puts("\r\n");
+    
+    schedule();
+    
+    return 0;
+}
 
 int video_player_test(void* fdt) {
     muart_puts("Starting system call test with initramfs.cpio program ...\r\n");
@@ -31,7 +51,7 @@ int video_player_test(void* fdt) {
     
     init_data->filename = "syscall.img";
     init_data->initramfs_addr = get_initramfs_address(fdt);
-    
+
     // Create a kernel thread that will load and execute syscall.img
     pid_t pid = kernel_thread(kernel_fork_process_cpio, init_data);
     if (pid < 0) {
@@ -68,14 +88,6 @@ void main(void* fdt){
     muart_send_hex(initramfs_addr);
     muart_puts("\r\n");
 
-    // Debug: Print the first few bytes at initramfs_addr
-    muart_puts("First 6 bytes at initramfs_addr: ");
-    const char* initramfs_ptr = (const char*)initramfs_addr;
-    for(int i = 0; i < 6; i++) {
-        muart_send(initramfs_ptr[i]);
-    }
-    muart_puts("\r\n");
-
     // Update the initramfs address in CPIO module
     set_initramfs_address(initramfs_addr);
 
@@ -102,6 +114,9 @@ void main(void* fdt){
     // muart_puts("=== Thread Test Completed ===\r\n");
 
     // syscall test
+    // syscall_test();
+    
+    // video player test
     video_player_test(fdt);
 
     // Start Simple Shell

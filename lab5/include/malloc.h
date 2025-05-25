@@ -99,14 +99,6 @@ void* dmalloc(size_t size);
  */
 void dfree(void* ptr);
 
-/**
- * Set a block of memory to zero.
- *
- * @param src Pointer to the memory block to be zeroed
- * @param n Number of bytes to set to zero
- */
-void memzero(unsigned long src, unsigned long n);
-
 /* Demo */
 /* Memory area for buddy system */
 #define BUDDY_MEM_START 0x10000000

@@ -7,7 +7,8 @@
 #include "pid.h"
 #include "exception.h"
 #include "syscall.h"
-
+#include "cpio.h"
+#include "mm.h"
 
 /* Thread Mechanism Progress : 
  * use `kernel_thread` to create a new thread and add it to run queue
@@ -358,16 +359,17 @@ void thread_test(){
 /* Basic Exercise 2 */
 // 等下要把 strcut trap_frame 的 data 放到 task's 的 kernel stack 的最上層
 // Get pointer to trap_frame at the top of a task's kernel stack
-struct trap_frame* task_pt_regs(struct task_struct* tsk) {
+struct trap_frame* task_tf(struct task_struct* tsk) {
     // trap frame is stored at the top of the kernel stack
     unsigned long p = (unsigned long)((char*)tsk->kernel_stack + THREAD_STACK_SIZE - TRAP_FRAME_SIZE);
     return (struct trap_frame*)p;
 }
 
+// Move the current thread to user mode and execute the user program
 int move_to_user_mode(unsigned long user_program_addr) {
     disable_irq_in_el1();
     struct task_struct* current = (struct task_struct*)get_current_thread();
-    struct trap_frame* regs = task_pt_regs(current);
+    struct trap_frame* regs = task_tf(current);
     
     // Initialize the trap frame
     memzero((unsigned long)regs, sizeof(*regs));
@@ -419,12 +421,70 @@ void sys_get_pid_test() {
     
     // Test read (this will block waiting for input)
     call_sys_uartwrite("Enter some text: ", 17);
-    size_t read_count = call_sys_uartread(read_buf, 10);    // Read up to 10 bytes, it must enter 10 characters to exit (just for test)
+    size_t read_count = call_sys_uartread(read_buf, 2);    // Read up to 10 bytes, it must enter 10 characters to exit (just for test)
     
     // Echo back what was read
     call_sys_uartwrite("You entered: ", 13);
     call_sys_uartwrite(read_buf, read_count);
     call_sys_uartwrite("\n", 1);
+
+    int cnt = 1;
+    int ret = 0;
+    if ((ret = call_sys_fork()) == 0) { // child
+        long long cur_sp;
+        asm volatile("mov %0, sp" : "=r"(cur_sp));
+        // printf("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", get_pid(), cnt, &cnt, cur_sp);
+        muart_puts("first child pid: ");
+        muart_send_dec(call_sys_getpid());
+        muart_puts(", cnt: ");
+        muart_send_dec(cnt);
+        muart_puts(", ptr: ");
+        muart_send_hex((unsigned int)cnt);
+        muart_puts(", sp: ");
+        muart_send_hex((unsigned int)cur_sp);
+        muart_puts("\r\n");
+        ++cnt;
+
+        if ((ret = call_sys_fork()) != 0){
+            asm volatile("mov %0, sp" : "=r"(cur_sp));
+            // printf("first child pid: %d, cnt: %d, ptr: %x, sp : %x\n", get_pid(), cnt, &cnt, cur_sp);
+            muart_puts("first child pid: ");
+            muart_send_dec(call_sys_getpid());
+            muart_puts(", cnt: ");
+            muart_send_dec(cnt);
+            muart_puts(", ptr: ");
+            muart_send_hex((unsigned int)cnt);
+            muart_puts(", sp: ");
+            muart_send_hex((unsigned int)cur_sp);
+            muart_puts("\r\n");
+        }
+        else{
+            while (cnt < 5) {
+                asm volatile("mov %0, sp" : "=r"(cur_sp));
+                // printf("second child pid: %d, cnt: %d, ptr: %x, sp : %x\n", get_pid(), cnt, &cnt, cur_sp);
+                muart_puts("second child pid: ");
+                muart_send_dec(call_sys_getpid());
+                muart_puts(", cnt: ");
+                muart_send_dec(cnt);
+                muart_puts(", ptr: ");
+                muart_send_hex((unsigned int)cnt);
+                muart_puts(", sp: ");
+                muart_send_hex((unsigned int)cur_sp);
+                muart_puts("\r\n"); 
+                waitCycle(1000000);
+                ++cnt;
+            }
+        }
+        call_sys_exit();
+    }
+    else {
+        // printf("parent here, pid %d, child %d\n", get_pid(), ret);
+        muart_puts("parent here, pid ");
+        muart_send_dec(call_sys_getpid());
+        muart_puts(", child ");
+        muart_send_dec(ret);
+        muart_puts("\r\n");
+    }
 
     // user thread exit
     call_sys_exit();
@@ -462,7 +522,7 @@ void kernel_fork_process_cpio(void* arg) {
     muart_puts("\r\n");
     
     // Load program using provided initramfs address
-    unsigned long user_program_addr = cpio_load_program((void*)init_data->initramfs_addr, init_data->filename);
+    unsigned long user_program_addr = cpio_load_program((const void*)init_data->initramfs_addr, init_data->filename);
     
     // Free initialization data
     dfree(init_data);

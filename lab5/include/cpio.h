@@ -39,6 +39,9 @@ void cpio_cat(const void*, const char*);
 /* Execute the user program in initramfs in EL0 */
 void cpio_exec(const void* cpio_file_addr, const char* file_name);
 
+/* Load the user program from initramfs and copy it to the task's user space */
+unsigned long cpio_load_program(const void* cpio_file_addr, const char* file_name);
+
 /* The API for other modules set the initramfs_address */
 void set_initramfs_address(unsigned int addr);
 

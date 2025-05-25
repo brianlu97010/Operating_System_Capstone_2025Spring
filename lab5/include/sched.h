@@ -89,4 +89,10 @@ void cpu_switch_to(struct task_struct* prev, struct task_struct* next);
 /* Get the current thread from the system register tpidr_el1 */
 unsigned long get_current_thread();
 
+/* Get pointer to trap_frame at the top of a task's kernel stack */
+struct trap_frame* task_tf(struct task_struct* tsk);
+
+/* Move the current thread to user mode and execute the user program */
+int move_to_user_mode(unsigned long user_program_addr);
+
 #endif

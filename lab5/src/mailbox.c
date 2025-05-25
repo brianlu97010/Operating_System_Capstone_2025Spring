@@ -3,9 +3,8 @@
 #include "utils.h"
 #include "muart.h"
 
-void mailbox_call(volatile unsigned int* msg){
-    unsigned int channel = 8;
-    unsigned int msg_addr = (unsigned int)msg;
+void mailbox_call(unsigned int channel, volatile unsigned int* msg){
+    unsigned long msg_addr = (unsigned long)msg;
     
     // Combine the message address (upper 28 bits) with channel number (lower 4 bits)  
     msg_addr = (msg_addr & ~0xF) | (channel & 0xF);
@@ -46,7 +45,7 @@ void get_board_revision(){
     // tags end
     mailbox[6] = END_TAG;
   
-    mailbox_call(mailbox); // message passing procedure call
+    mailbox_call(8, mailbox); // message passing procedure call
 
     if(mailbox[1] == REQUEST_SUCCEED) {
         muart_puts("Board Revision : ");    // it should be 0xa020d3 for rpi3 b+
@@ -73,7 +72,7 @@ void get_memory_info(){
     // tags end
     mailbox[7] = END_TAG;
   
-    mailbox_call(mailbox); // message passing procedure call
+    mailbox_call(8, mailbox); // message passing procedure call
 
     if(mailbox[1] == REQUEST_SUCCEED) {
         muart_puts("ARM memory base address : ");
