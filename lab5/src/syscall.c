@@ -315,15 +315,30 @@ int sys_mbox_call(unsigned int ch, unsigned int *mbox) {
 }
 
 void sys_kill(int pid) {
+    disable_irq_in_el1();
     struct list_head* pos;
+    struct list_head* n;
     struct task_struct* task;
     
-    list_for_each(pos, &task_lists) {
+    list_for_each_safe(pos, n, &task_lists) {
         task = list_entry(pos, struct task_struct, task);
         if (task->pid == pid) {
+            muart_puts("Killing task PID: ");
+            muart_send_dec(pid);
+            muart_puts("\r\n");
+            
             task->state = TASK_ZOMBIE;
-            list_del(&task->list);
+            
+            if (!list_empty(&task->list)) {
+                list_del(&task->list);
+            }
+            
+            if (task == get_current_thread()) {
+                schedule();
+            }
+    
+            enable_irq_in_el1();
             return;
         }
     }
-} 
+}
