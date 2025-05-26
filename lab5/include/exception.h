@@ -50,6 +50,11 @@ extern unsigned long get_current_el(void);
 /* Enble / Disable el1 interrupts */
 extern void enable_irq_in_el1(void);
 extern void disable_irq_in_el1(void);
+
+/* Entry point of return the system call */
+void ret_from_syscall(void);
+
+void ret_to_user(void);
 #endif
 
 #endif

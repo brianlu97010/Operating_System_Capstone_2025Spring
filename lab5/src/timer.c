@@ -3,14 +3,18 @@
 #include "exception.h"
 #include "string.h"
 #include "malloc.h"
+#include "sched.h"
+#include "list.h"
 
 static timer_t* timer_list = NULL;
 
-/* Enable the core timer and disable the core timer interrupt at initialization first */
+/* Enable the core timer and enable the core timer interrupt */
 void core_timer_init() {
     // Enable the core timer
     enable_core_timer();
-    disable_core_timer_int();
+
+    // Enable core timer interrupt
+    enable_core_timer_int();
     
     // Reset timer with frequency shifted right by 5 bits
     asm volatile (
@@ -39,9 +43,9 @@ unsigned long get_system_time(){
 /* Timer basic specific IRQ handler: Print elapsed time since boot and reset timer  */
 void timer_basic_irq_handler(){
     // Print elapsed time
-    muart_puts("Time since boot: ");
-    muart_send_dec(get_system_time());
-    muart_puts(" seconds\r\n");
+    // muart_puts("Time since boot: ");
+    // muart_send_dec(get_system_time());
+    // muart_puts(" seconds\r\n");
     
     // Reset timer for next interrupt
     set_core_timer();
@@ -57,6 +61,8 @@ void timer_irq_handler(void){
     else{
         timer_basic_irq_handler();
     }
+
+    schedule();
 }
 
 

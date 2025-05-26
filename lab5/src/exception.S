@@ -10,9 +10,10 @@
 .global get_current_el
 .global enable_irq_in_el1
 .global disable_irq_in_el1
+.global ret_from_syscall
 
 
-
+/* Old version, didn't save the sp_el0, elr_el1, spsr_el1 registers */
 // save general registers to stack
 .macro save_all_reg 
     sub sp, sp, 32 * 8           // Creates space on the stack to store all 31 general-purpose registers (x0-x30), each register is 64bit-width = 8bytes
@@ -144,7 +145,7 @@ exception_vector_table:
     // Exception from the current EL while using SP_ELx
     b sync_exception_handler        // Synchronous
     .align 7            
-    b irq_handler                   // IRQ/vIRQ
+    b irq_handler_el1                   // IRQ/vIRQ
     .align 7
     b other_exception_handler       // FIQ/vFIQ
     .align 7
@@ -154,7 +155,7 @@ exception_vector_table:
     // Exception from a lower EL and at least one lower EL is AArch64
     b el0_sync                      // Synchronous
     .align 7            
-    b irq_handler                   // IRQ/vIRQ
+    b irq_handler_el0                   // IRQ/vIRQ
     .align 7
     b other_exception_handler       // FIQ/vFIQ
     .align 7
@@ -177,13 +178,22 @@ set_exception_vector_table:
     msr vbar_el1, x0
     ret
 
+irq_handler_el0:
+    kernel_entry 0
+    bl irq_entry
+    kernel_exit 0
+
+irq_handler_el1:
+    kernel_entry 1
+    bl irq_entry
+    kernel_exit 1   
+
 // high-level handler of Synchronous Exception 
 // store the registers before handling exception and check the exception type then branch to specific exception handler
 sync_exception_handler:
-    save_all_reg                // Save the registers before handling exception
+    kernel_entry 0                // Save the registers before handling exception
     bl svc_handler
-    load_all_reg                // Restore the registers after handling exception
-    eret
+    kernel_exit 0              // Restore the registers after handling exception
 
 // high-level handler of IRQ
 // store the registers before handling interrupt and check the IRQ type then branch to specific IRQ handler
@@ -199,6 +209,7 @@ other_exception_handler:
     load_all_reg                // Restore the registers after handling exception
     eret
 
+// Disable interrupts in EL1 by hardware automatically when an exception occurs
 // Read the ESR register to determine the type of exception, if is svc, then jump to `el0_svc`
 // if not, then jump to `handle_invalid_entry`
 el0_sync:
@@ -218,13 +229,16 @@ el0_svc:
     b	ret_from_syscall				// when the syscall is done, jump to `ret_from_syscall` to return to the user process
 
 // After the syscall is done, cpu will return to this label
-// first enable the interrupts
+// first disable the interrupts to prevent the race condition when restoring the user context,
 // then restore the user context in the stack
 ret_from_syscall:
-	bl	enable_irq_in_el1				
+	bl	disable_irq_in_el1				
 	kernel_exit 0					// restore the user context in the stack (because we save the return value of the syscall in the stack (trap frame) in syscall_handler(), now 
 									// x0 regiser is the return value of the syscall), finally, called `eret` instruction to return to the user process (switching to EL0)
-
+.global ret_to_user
+ret_to_user:
+    bl disable_irq_in_el1
+    kernel_exit 0
 
 /*
 // Switch to EL0 and execute the user program at EL0

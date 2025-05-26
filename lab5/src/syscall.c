@@ -10,13 +10,14 @@
 #include "exception.h"
 #include "mm.h"
 #include "pid.h"
+#include "registers.h"
+#include "utils.h"
 
 
 void syscall_handler(struct trap_frame* tf) {
-    // Get the system call number from x8 in the trap frame
+    // Get the syscall number from X8 register
     unsigned long syscall_num = tf->regs[8];
     
-
     // Handle the system call, the arguments from x0-x7 in the trap frame
     unsigned long ret = 0;
     switch(syscall_num) {
@@ -95,6 +96,9 @@ int sys_exec(const char* name, char *const argv[]) {
         return -1;
     }
 
+    // Disable interrupts when updating the trap frame
+    disable_irq_in_el1();
+
     // Update trap frame to start executing new program
     struct trap_frame* regs = task_tf(current);
     
@@ -106,6 +110,8 @@ int sys_exec(const char* name, char *const argv[]) {
     regs->sp_el0 = (unsigned long)current->user_stack + THREAD_STACK_SIZE;
     regs->spsr_el1 = 0;  // EL0t mode
     
+    enable_irq_in_el1();
+
     muart_puts("exec() successful, new program loaded at: ");
     muart_send_hex(new_program_addr);
     muart_puts("\r\n");
@@ -113,7 +119,9 @@ int sys_exec(const char* name, char *const argv[]) {
     return 0;
 }
 
-int sys_fork(void) {
+int sys_fork() {
+    disable_irq_in_el1();
+    
     muart_puts("Fork system call invoked\r\n");
     struct task_struct* parent = (struct task_struct*)get_current_thread();
     struct task_struct* child;
@@ -122,6 +130,7 @@ int sys_fork(void) {
     child = (struct task_struct*)dmalloc(sizeof(struct task_struct));
     if (!child) {
         muart_puts("fork: Failed to allocate task structure\r\n");
+        enable_irq_in_el1();
         return -1;
     }
 
@@ -129,6 +138,7 @@ int sys_fork(void) {
     if (child->pid < 0) {
         dfree(child);
         muart_puts("fork: Failed to allocate PID\r\n");
+        enable_irq_in_el1();
         return -1;
     }
     
@@ -137,68 +147,123 @@ int sys_fork(void) {
         pid_free(child->pid);
         dfree(child);
         muart_puts("fork: Failed to allocate kernel stack\r\n");
+        enable_irq_in_el1();
         return -1;
     }
-
-    // Allocate 一個 memory space 給 child 的 user program 使用
-    child->user_program = dmalloc(parent->user_program_size);
-
-    // copy whole parent's user program data to child's user program memory space
-    if (!child->user_program) {
-        dfree(child->kernel_stack);
-        pid_free(child->pid);
-        dfree(child);
-        muart_puts("fork: Failed to allocate user program\r\n");
-        return -1;
-    }
-    memcpy(child->user_program, parent->user_program, parent->user_program_size);
-    child->user_program_size = parent->user_program_size;
-
+    
     // Allocate user stack for child
     child->user_stack = dmalloc(THREAD_STACK_SIZE);
     if (!child->user_stack) {
         dfree(child->kernel_stack);
         pid_free(child->pid);
         dfree(child);
-        dfree(child->user_program);
         muart_puts("fork: Failed to allocate user stack\r\n");
+        enable_irq_in_el1();
         return -1;
     }
-    // Copy parent's user stack data to child's user stack
+
+    // Copy the stacks
+    memcpy(child->kernel_stack, parent->kernel_stack, THREAD_STACK_SIZE);
     memcpy(child->user_stack, parent->user_stack, THREAD_STACK_SIZE);
-    
+
+    child->user_program = parent->user_program;  // Share user program pointer
+    child->user_program_size = parent->user_program_size; 
+
     child->parent = parent;
     child->state = TASK_RUNNING;
 
-    // Copy CPU context from parent to child
-    child->cpu_context = parent->cpu_context;
-    
-    // Set the child task's stack pointer to the top of its user stack
-    child->cpu_context.sp = (unsigned long)((char*)child->kernel_stack + THREAD_STACK_SIZE);
+    /*
+    // Calculate memory offsets
+    long kstack_offset = (long)child->kernel_stack - (long)parent->kernel_stack;
+    long ustack_offset = (long)child->user_stack - (long)parent->user_stack;
+    */
 
-    // Set the child task's trap frame
+    // Get trap frames
     struct trap_frame* parent_tf = task_tf(parent);
     struct trap_frame* child_tf = task_tf(child);
-
+    
     // Copy the parent's trap frame to the child's trap frame
     memcpy(child_tf, parent_tf, sizeof(struct trap_frame));
 
-    // Set the return value in the child's trap frame to 0 (indicating fork success)
-    child_tf->regs[0] = 0;
+    child_tf->regs[19] = 0;
+    child_tf->regs[20] = 0;
 
-    // Set the return value in the parent's trap frame to the child's PID
-    parent_tf->regs[0] = child->pid;
+    // Adjust child's SP_EL0 to point to child's user stack with same offset
+    unsigned long parent_sp_offset = parent_tf->sp_el0 - (unsigned long)parent->user_stack;
+    child_tf->sp_el0 = (unsigned long)child->user_stack + parent_sp_offset;
 
-    // Set the child's sp_el0 according to the parent's user stack's usage
-    long stack_offset = parent_tf->sp_el0 - (unsigned long)parent->user_stack;
-    child_tf->sp_el0 = (unsigned long)child->user_stack + stack_offset;
+    /* 靠邀 結果是 mailbox 的問題 我這邊不改好像也沒差 ==
+    // Adjust all registers in child's trap frame that point to parent's memory
+    for (int i = 0; i < 31; i++) {
+        unsigned long reg_val = parent_tf->regs[i];
+        
+        // Check if register points into parent's user stack
+        if (reg_val >= (unsigned long)parent->user_stack && 
+            reg_val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
+            
+            child_tf->regs[i] = reg_val + ustack_offset;
+            
+            muart_puts("  Adjusted child X");
+            muart_send_dec(i);
+            muart_puts(": ");
+            muart_send_hex(reg_val);
+            muart_puts(" -> ");
+            muart_send_hex(child_tf->regs[i]);
+            muart_puts("\r\n");
+        }
+    }
+
+ 
+    // 調整 child stacks 中的指標
+    unsigned long* child_ustack_ptr = (unsigned long*)child->user_stack;
+    unsigned long* child_kstack_ptr = (unsigned long*)child->kernel_stack;
+
+    // 調整 child user stack 中的指標
+    for (int i = 0; i < THREAD_STACK_SIZE / sizeof(unsigned long); i++) {
+        unsigned long val = child_ustack_ptr[i];
+        
+        // Check if this value looks like a pointer to parent's user stack
+        if (val >= (unsigned long)parent->user_stack && 
+            val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
+            
+            child_ustack_ptr[i] = val + ustack_offset;
+        }
+        // Check if this value looks like a pointer to parent's kernel stack
+        else if (val >= (unsigned long)parent->kernel_stack && 
+                val < (unsigned long)parent->kernel_stack + THREAD_STACK_SIZE) {
+            
+            child_ustack_ptr[i] = val + kstack_offset;
+        }
+    }
+
+    // 調整 child kernel stack 中的指標
+    for (int i = 0; i < THREAD_STACK_SIZE / sizeof(unsigned long); i++) {
+        unsigned long val = child_kstack_ptr[i];
+        
+        // Check if this value looks like a pointer to parent's user stack
+        if (val >= (unsigned long)parent->user_stack && 
+            val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
+            
+            child_kstack_ptr[i] = val + ustack_offset;
+        }
+        // Check if this value looks like a pointer to parent's kernel stack
+        else if (val >= (unsigned long)parent->kernel_stack && 
+                val < (unsigned long)parent->kernel_stack + THREAD_STACK_SIZE) {
+            
+            child_kstack_ptr[i] = val + kstack_offset;
+        }
+    }
+    */
     
-    // Set the child's elr_el1 to the parent's elr_el1 offset by the child's user program address (continue the execution from the same point)
-    long pc_offset = parent_tf->elr_el1 - (unsigned long)parent->user_program;
-    child_tf->elr_el1 = (unsigned long)child->user_program + pc_offset;
 
-    // Set the child's spsr_el1 to 0 (EL0t mode)
-    child_tf->spsr_el1 = 0;  // EL0t mode
+    // Set the return values
+    child_tf->regs[0] = 0;  // Child returns 0
+    parent_tf->regs[0] = child->pid;  // Parent returns child PID
+
+    // Set up child's CPU context
+    memzero((unsigned long)&child->cpu_context, sizeof(struct cpu_context));
+    child->cpu_context.lr = (unsigned long)ret_to_user; 
+    child->cpu_context.sp = (unsigned long)child_tf;
 
     // Add the child task to the run queue
     INIT_LIST_HEAD(&child->list);
@@ -207,7 +272,9 @@ int sys_fork(void) {
     // Add the child task to the task list
     INIT_LIST_HEAD(&child->task);
     list_add_tail(&child->task, &task_lists);
-    
+
+    enable_irq_in_el1();    // Will enter schedule() since timer interrupt
+
     return child->pid;  // Return child's PID to the parent
 }
 
@@ -216,11 +283,37 @@ void sys_exit() {
 }
 
 int sys_mbox_call(unsigned int ch, unsigned int *mbox) {
-    mailbox_call(ch, mbox);
+    disable_irq_in_el1();
+
+    unsigned long msg_addr = (unsigned long)mbox;
+    
+    // Combine the message address (upper 28 bits) with channel number (lower 4 bits)  
+    msg_addr = (msg_addr & ~0xF) | (ch & 0xF);
+    
+    // Check whether the Mailbox 0 status register’s full flag is set.
+    while( regRead(MAILBOX_STATUS) & MAILBOX_FULL ){
+        // Mailbox is Full: do nothing
+    }
+    // If not, then you can write the data to Mailbox 1 Read/Write register.
+    regWrite(MAILBOX_WRITE, msg_addr);
+    
+    while(1){
+        // Check whether the Mailbox 0 status register’s empty flag is set.
+        while( regRead(MAILBOX_STATUS) & MAILBOX_EMPTY ){
+            // Mailbox is Empty: do nothing
+        }
+        // If not, then you can read from Mailbox 0 Read/Write register.
+        unsigned int response = regRead(MAILBOX_READ);
+    
+        // Check if the value is the same as you wrote in step 1.
+        if((response & 0xF) == ch){
+            return;     // 這邊不要亂加 return 0，加了會狂跳 exception，原因 I don't know ==
+        }
+    }
+    enable_irq_in_el1();
     return 0;
 }
 
-// Todo
 void sys_kill(int pid) {
     struct list_head* pos;
     struct task_struct* task;

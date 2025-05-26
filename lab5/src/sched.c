@@ -115,10 +115,14 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
  * 目前 schedule() 只會在以下幾種情況被呼叫
  * 1. Thread Voluntary Yielding CPU
  * 2. Thread Exit (called in funtion `thread_exit()`)
+ * 3. Timer interrupt (called in `timer_irq_handler()`) 
  */
 void schedule(){
     // Disable interrupt when pick a thread in run queue (prevent race conditions when accessing global variable like run queue, pid_bitmap and task list)
     disable_irq_in_el1();
+
+    // debug msg
+    // muart_puts("\r\nEnter schedule()\r\n");
 
     struct task_struct* prev = (struct task_struct*)get_current_thread();
     struct task_struct* next = NULL;    // the next task to run
@@ -153,11 +157,12 @@ void schedule(){
 
     // If next thread to be executing is same as current thread, don't switch
     if (next != prev) {
-        muart_puts("Switching from thread ");
-        muart_send_dec(prev ? prev->pid : 0);
-        muart_puts(" to thread ");
-        muart_send_dec(next->pid);
-        muart_puts("\r\n");
+        // debug
+        // muart_puts("Switching from thread ");
+        // muart_send_dec(prev ? prev->pid : 0);
+        // muart_puts(" to thread ");
+        // muart_send_dec(next->pid);
+        // muart_puts("\r\n");
         
         // Perform context switch
         cpu_switch_to(prev, next);
@@ -327,7 +332,6 @@ void sched_init(){
 }
 
 
-// 這裡上面都 OK 
 
 /* Basic Exercise 1 : Test the thread */
 void foo(void* data){
@@ -380,7 +384,6 @@ int move_to_user_mode(unsigned long user_program_addr) {
     muart_send_hex((unsigned int)user_program_addr);
     muart_puts("\r\n");
     
-    // (Optional) Verify function is accessible by reading a few bytes
     // muart_puts("First bytes of function: ");
     // unsigned char* func = (unsigned char*)pc;
     // for (int i = 0; i < 8; i++) {
@@ -412,21 +415,21 @@ void sys_get_pid_test() {
     muart_send_dec(pid);
     muart_puts("\r\n");
 
-    // Test the UART system call
-    char write_buf[] = "Hello, UART!\n";
-    char read_buf[64];
+    // // Test the UART system call
+    // char write_buf[] = "Hello, UART!\n";
+    // char read_buf[64];
     
-    // Test write
-    size_t written = call_sys_uartwrite(write_buf, sizeof(write_buf) - 1);
+    // // Test write
+    // size_t written = call_sys_uartwrite(write_buf, sizeof(write_buf) - 1);
     
-    // Test read (this will block waiting for input)
-    call_sys_uartwrite("Enter some text: ", 17);
-    size_t read_count = call_sys_uartread(read_buf, 2);    // Read up to 10 bytes, it must enter 10 characters to exit (just for test)
+    // // Test read (this will block waiting for input)
+    // call_sys_uartwrite("Enter some text: ", 17);
+    // size_t read_count = call_sys_uartread(read_buf, 2);    // Read up to 10 bytes, it must enter 10 characters to exit (just for test)
     
-    // Echo back what was read
-    call_sys_uartwrite("You entered: ", 13);
-    call_sys_uartwrite(read_buf, read_count);
-    call_sys_uartwrite("\n", 1);
+    // // Echo back what was read
+    // call_sys_uartwrite("You entered: ", 13);
+    // call_sys_uartwrite(read_buf, read_count);
+    // call_sys_uartwrite("\n", 1);
 
     int cnt = 1;
     int ret = 0;

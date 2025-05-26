@@ -33,6 +33,7 @@ ret_from_kernel_thread:
     // x19 contains the function pointer
     // x20 contains the argument
     bl enable_irq_in_el1
+    cbz x19, ret_to_user
     mov x0, x20
     blr x19
     bl thread_exit

@@ -5,6 +5,7 @@
 #include "timer.h"
 #include "syscall.h"
 #include "async_uart.h"
+#include "sched.h"
 
 /* The API to initialize the exception vector table */
 void exception_table_init(){
@@ -52,8 +53,11 @@ void svc_handler(){
     muart_puts("\r\n");
     
     // Get the ESR.EC (Exception Class) from bits [31:26] (total 6 bits)
-    unsigned long ec = (esr >> 26) & 0x3F;   // right shift 26 bits and get the last 6 bits
-    
+    muart_puts("Exception Class (EC): ");
+    unsigned long ec = (esr >> 26) & 0x3F;
+    muart_send_hex(ec);
+    muart_puts("\r\n");
+
     muart_puts("Cause of exception : ");
     switch(ec) {
         case 0x15:
@@ -75,6 +79,7 @@ void irq_entry(void) {
     
     // Check if it's a timer interrupt (bit 1 stands for CNTPNSIRQ interrupt)
     if (irq_status & 2){
+        // muart_puts("\r\nTimer interrupt received\r\n");
         // If bit 1 is set, branch to timer-specific handler
         timer_irq_handler();
     }

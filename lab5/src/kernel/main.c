@@ -94,6 +94,7 @@ void main(void* fdt){
     // Initialize the vector table
     exception_table_init();
     
+    // Enable the core timer and enable the core timer interrupt
     core_timer_init();
     muart_puts("Core timer initialized successful !\r\n");
 
