@@ -1,3 +1,92 @@
+copy the parent’s kernel stack and user stack data to child’s kernel stack and user stack
+
+child’s user program share with parent’s user program
+
+copy the parent’s trap frame data to child’s trap frame
+including the 
+```
+struct trap_frame {
+    unsigned long regs[31];     // General purpose registers x0-x30
+    unsigned long sp_el0;       // Stack pointer
+    unsigned long elr_el1;      // Program counter
+    unsigned long spsr_el1;     // Processor state
+};
+```
+When the child process return to user mode.
+```
+    ret_to_user:
+        bl disable_irq_in_el1
+        kernel_exit 0
+```
+It uses this trap frame to restore it’s status
+
+So we need to modified the sp_el0 to let the child thread switch to user mode and can use it’s own user stack
+```
+    unsigned long parent_sp_offset = parent_tf->sp_el0 - (unsigned long)parent->user_stack;
+    child_tf->sp_el0 = (unsigned long)child->user_stack + parent_sp_offset;
+```
+Then set the return value of fork system call
+```
+    child_tf->regs[0] = 0;  // Child returns 0
+```
+
+Set up the child thread’s cpu context
+```
+    memzero((unsigned long)&child->cpu_context, sizeof(struct cpu_context));
+    child->cpu_context.lr = (unsigned long)ret_to_user; 
+    child->cpu_context.sp = (unsigned long)child_tf;
+```
+
+This is for when the scheduler pick up the child thread, it will call `cpu_switch_to` to restore it’s cpu context :
+```
+cpu_switch_to:
+    // Save the current thread's context
+    stp x19, x20, [x0, 16 * 0]
+    stp x21, x22, [x0, 16 * 1]
+    stp x23, x24, [x0, 16 * 2]
+    stp x25, x26, [x0, 16 * 3]
+    stp x27, x28, [x0, 16 * 4]
+    stp fp, lr, [x0, 16 * 5]
+    mov x9, sp
+    str x9, [x0, 16 * 6]
+
+    // Load the next thread's context
+    ldp x19, x20, [x1, 16 * 0]
+    ldp x21, x22, [x1, 16 * 1]
+    ldp x23, x24, [x1, 16 * 2]
+    ldp x25, x26, [x1, 16 * 3]
+    ldp x27, x28, [x1, 16 * 4]
+    ldp fp, lr, [x1, 16 * 5]
+    ldr x9, [x1, 16 * 6]
+    mov sp, x9
+    msr tpidr_el1, x1 
+    ret
+```
+
+Hence we need to modify `lr` and `sp` registers when creating child thread : 
+```
+    child->cpu_context.lr = (unsigned long)ret_to_user; 
+    child->cpu_context.sp = (unsigned long)child_tf;
+```
+
+After `cpu_switch_to` executed, it will `ret` to `child->cpu_context.lr` i.e, `ret_to_user`
+```
+ret_to_user:
+    bl disable_irq_in_el1
+    kernel_exit 0
+```
+it restore the trap frame of child thread’s trap frame
+```
+struct trap_frame {
+    unsigned long regs[31];     // Same as parent’s thread
+    unsigned long sp_el0;       // child’s user stack pointer
+    unsigned long elr_el1;      // Same as parent’s thread
+    unsigned long spsr_el1;     // EL0t
+};
+```
+
+After `eret`, it return to the `elr_el1` i.e, the user program where trigger the exception `svc` and continue executing the user program using user thread’s own user stack 
+
 # OSC 2025 | Lab 4: Allocator
 > [!IMPORTANT]
 > Todo :
