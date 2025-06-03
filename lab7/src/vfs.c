@@ -422,6 +422,15 @@ int allocate_fd(struct task_struct* task) {
 }
 
 void get_abs_path(char *path, char *cwd) {
+    #if LOG_VFS
+        muart_puts("[get_abs_path] Input path name: ");
+        muart_puts(path);
+        muart_puts("\r\n");
+        muart_puts("[get_abs_path] Current working directory: ");
+        muart_puts(cwd);
+        muart_puts("\r\n");
+    #endif
+    // Concate the cwd and path if the path is not absolute
     if (path[0] != '/') { 
         char tmp[MAX_PATH_LENGTH];
         strcpy(tmp, cwd);
@@ -431,6 +440,11 @@ void get_abs_path(char *path, char *cwd) {
         strcat(tmp, path);
         strcpy(path, tmp);
     }
+    #if LOG_VFS
+        muart_puts("[get_abs_path] After concatenation: ");
+        muart_puts(path);
+        muart_puts("\r\n");
+    #endif
 
     char abs_path[MAX_PATH_LENGTH + 1];
     memzero(abs_path, sizeof(abs_path));
@@ -456,4 +470,9 @@ void get_abs_path(char *path, char *cwd) {
     }
     abs_path[idx] = 0;
     strcpy(path, abs_path);
+    #if LOG_VFS
+        muart_puts("[get_abs_path] Final absolute path: ");
+        muart_puts(path);
+        muart_puts("\r\n");
+    #endif 
 }
