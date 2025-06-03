@@ -5,7 +5,7 @@
 #include "sched.h"
 #include "mm.h"
 
-#define LOG_VFS 1
+#define LOG_VFS 0
 #if LOG_VFS
 #include "muart.h"
 #endif

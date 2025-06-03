@@ -14,7 +14,7 @@
 #include "utils.h"
 #include "vfs.h"
 
-#define LOG_SYSCALL 1
+#define LOG_SYSCALL 0
 
 void syscall_handler(struct trap_frame* tf) {
     // Get the syscall number from X8 register
