@@ -96,3 +96,58 @@ int strncmp(const char* str1, const char* str2, size_t n) {
     }
     return 0;
 }
+
+/**
+ * strcpy - Copy string from source to destination
+ * @dest: destination buffer
+ * @src: source string
+ * 
+ * Returns: pointer to destination string
+ * 
+ * Note: Caller must ensure dest has enough space to hold src + null terminator
+ */
+char* strcpy(char* dest, const char* src) {
+    char* original_dest = dest;
+    
+    // Copy characters one by one until null terminator
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    
+    // Copy the null terminator
+    *dest = '\0';
+    
+    return original_dest;
+}
+
+/**
+ * strcat - Concatenate source string to destination string
+ * @dest: destination string (must be null-terminated)
+ * @src: source string to append
+ * 
+ * Returns: pointer to destination string
+ * 
+ * Note: Caller must ensure dest has enough space to hold the concatenated result
+ */
+char* strcat(char* dest, const char* src) {
+    char* original_dest = dest;
+    
+    // Find the end of destination string
+    while (*dest != '\0') {
+        dest++;
+    }
+    
+    // Append source string to destination
+    while (*src != '\0') {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+    
+    // Add null terminator
+    *dest = '\0';
+    
+    return original_dest;
+}

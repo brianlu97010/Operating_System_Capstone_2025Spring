@@ -37,4 +37,26 @@ size_t strlen(const char* str);
  */
 char* strncpy(char* dest, const char* src, size_t n);
 
+/**
+ * strcpy - Copy string from source to destination
+ * @dest: destination buffer
+ * @src: source string
+ * 
+ * Returns: pointer to destination string
+ * 
+ * Note: Caller must ensure dest has enough space to hold src + null terminator
+ */
+char* strcpy(char* dest, const char* src);
+
+/**
+ * strcat - Concatenate source string to destination string
+ * @dest: destination string (must be null-terminated)
+ * @src: source string to append
+ * 
+ * Returns: pointer to destination string
+ * 
+ * Note: Caller must ensure dest has enough space to hold the concatenated result
+ */
+char* strcat(char* dest, const char* src);
+
 #endif
