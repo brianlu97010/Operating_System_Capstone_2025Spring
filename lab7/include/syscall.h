@@ -15,6 +15,14 @@
 #define SYS_EXIT        5
 #define SYS_MBOX_CALL   6
 #define SYS_KILL        7
+#define SYS_OPEN        11
+#define SYS_CLOSE       12
+#define SYS_WRITE       13
+#define SYS_READ        14
+#define SYS_MKDIR       15
+#define SYS_MOUNT       16
+#define SYS_CHDIR       17
+
 
 #ifndef __ASSEMBLER__
 /* System call function declarations */
@@ -26,6 +34,14 @@ int sys_fork(void);
 void sys_exit(void);
 int sys_mbox_call(unsigned int ch, unsigned int *mbox);
 void sys_kill(int pid);
+
+int open(const char *pathname, int flags);
+int close(int fd);
+long write(int fd, const void *buf, unsigned long count);
+long read(int fd, void *buf, unsigned long count);
+int mkdir(const char *pathname, unsigned mode);
+int mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data);
+int chdir(const char *path);
 
 /* System call handler */
 // void syscall_handler(void);

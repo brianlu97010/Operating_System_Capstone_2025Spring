@@ -4,6 +4,7 @@
 #include "types.h"
 #include "list.h"
 #include "pid.h"
+#include "vfs.h"
 
 #define THREAD_STACK_SIZE 4096
 
@@ -11,6 +12,10 @@
 #define TASK_RUNNING    0
 #define TASK_ZOMBIE     1
 #define TASK_DEAD       2
+
+/* VFS */
+#define MAX_OPEN_FILES  16
+#define MAX_PATH_LENGTH 256
 
 /* Functions that thread needs to do */
 typedef void (*thread_func_t)(void *);
@@ -44,6 +49,10 @@ struct task_struct {
     size_t user_program_size;     // Size of user program for cleanup
     struct list_head list;    // For run queue
     struct list_head task;    // For task list
+
+    // Virtual File System
+    char cwd[MAX_PATH_LENGTH]; // Current working directory
+    struct file* fd_table[MAX_OPEN_FILES];  // File descriptor table
 };
 
 /* Pass initramfs address through task structure */

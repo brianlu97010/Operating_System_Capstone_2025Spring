@@ -106,6 +106,9 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
     INIT_LIST_HEAD(&new_task->task);
     list_add_tail(&new_task->task, &task_lists);
 
+    // VFS init
+    vfs_task_init(new_task);
+    
     enable_irq_in_el1();
     return new_task->pid;
 }
@@ -254,6 +257,9 @@ void idle_task_fn(){
                 // Remove from task list 
                 list_del(&zombie->task);
                 
+                // Cleanup VFS resources for the zombie task
+                vfs_cleanup_task(zombie);  
+
                 // Free the zombie itself
                 dfree(zombie);
             }
