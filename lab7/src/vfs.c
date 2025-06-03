@@ -5,7 +5,7 @@
 #include "sched.h"
 #include "mm.h"
 
-#define LOG_VFS 0
+#define LOG_VFS 1
 #if LOG_VFS
 #include "muart.h"
 #endif
@@ -445,12 +445,19 @@ void get_abs_path(char *path, char *cwd) {
         muart_puts(path);
         muart_puts("\r\n");
     #endif
-
+    /* 
+     * Example
+     * Input path name: ../lookup2
+     * Current working directory: /tmp
+     * After concatenation: /tmp/../lookup2
+     */
     char abs_path[MAX_PATH_LENGTH + 1];
     memzero(abs_path, sizeof(abs_path));
     int idx = 0;
     for (int i = 0; i < strlen(path); i++) {
         if (path[i] == '/' && path[i + 1] == '.' && path[i + 2] == '.') {
+            // Find the latest '/' position and remove the last component
+            // e,g, "/tmp" -> "\0", then restart from the position after /..
             for (int j = idx; j >= 0; j--) {
                 if (abs_path[j] == '/') {
                     abs_path[j] = 0;
@@ -461,6 +468,7 @@ void get_abs_path(char *path, char *cwd) {
             continue;
         }
 
+        // if "/." , just skip it , because it means current directory
         if (path[i] == '/' && path[i + 1] == '.') {
             i++;
             continue;
@@ -475,4 +483,5 @@ void get_abs_path(char *path, char *cwd) {
         muart_puts(path);
         muart_puts("\r\n");
     #endif 
+    // Final absolute path: /lookup2
 }

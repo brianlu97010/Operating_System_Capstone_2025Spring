@@ -14,7 +14,7 @@
 #include "utils.h"
 #include "vfs.h"
 
-#define LOG_SYSCALL 0
+#define LOG_SYSCALL 1
 
 void syscall_handler(struct trap_frame* tf) {
     // Get the syscall number from X8 register
@@ -569,17 +569,23 @@ int mount(const char *src, const char *target, const char *filesystem, unsigned 
 
 // syscall number : 17
 int chdir(const char *path) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
     #if LOG_SYSCALL
-        muart_puts("[sys_chdir] Changing directory to: ");
+        muart_puts("[sys_chdir] Changing directory ");
+        muart_puts(current->cwd);
+        muart_puts(" to ");             
         muart_puts(path);
         muart_puts("\r\n");
     #endif
-    
-    struct task_struct* current = (struct task_struct*)get_current_thread();
+
     char abs_path[MAX_PATH_LENGTH];
     strcpy(abs_path, path);
     get_abs_path(abs_path, current->cwd);
     strcpy(current->cwd, abs_path);
-
+    #if LOG_SYSCALL
+        muart_puts("[sys_chdir] Directory now is ");
+        muart_puts(current->cwd);
+        muart_puts("\r\n");
+    #endif
     return 0;
 }
