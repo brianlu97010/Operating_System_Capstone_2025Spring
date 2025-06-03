@@ -17,6 +17,6 @@ void muart_puts(const char*);
 void muart_send_hex(unsigned int);
 
 /* Transmit the int data to host in decimal */
-void muart_send_dec(unsigned int);
+void muart_send_dec(int);
 
 #endif

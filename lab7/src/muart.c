@@ -57,36 +57,37 @@ void muart_send_hex(unsigned int value) {
 }
 
 /* Transmit the int data to host in decimal */
-void muart_send_dec(unsigned int num){
-    // Handle the case where num is 0
+void muart_send_dec(int num){
     if (num == 0){
         muart_send('0');
         return;
     }
-    
-    // Calculate how many digits in the number
+
+    // Handle negative number
+    if (num < 0){
+        muart_send('-');
+        num = -num;
+    }
+
+    // Calculate digits
     unsigned int temp = num;
     unsigned int digit_count = 0;
-    
     while (temp > 0){
         digit_count++;
         temp /= 10;
     }
-    
-    // Create a buffer to store the digits in reverse order
-    char digits[10]; // Maximum 10 digits for 32-bit unsigned int
-    
-    // Extract digits in reverse order
+
+    char digits[10];
     for (int i = digit_count - 1; i >= 0; i--){
         digits[i] = '0' + (num % 10);
         num /= 10;
     }
-    
-    // Print the digits
+
     for (unsigned int i = 0; i < digit_count; i++){
         muart_send(digits[i]);
     }
 }
+
 
 /* Initialize the mini UART */
 void muart_init(){
