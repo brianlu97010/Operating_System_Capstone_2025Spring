@@ -31,6 +31,7 @@ set_core_timer:
 set_core_timer:
     // Set expired time for 1 sec, the timer interrupt asserted when CNTP_CVAL_EL0 >= CNTPCT_EL0
     mrs x0, cntfrq_el0      // Read the frequency of the system counter
+    lsr x0, x0, #6
     msr cntp_tval_el0, x0   // Write the ticks to cntp_tval_el0 that means CNTP_CVAL_EL0 is set to CNTPCT_EL0 + 2*system frequency
     ret
 
