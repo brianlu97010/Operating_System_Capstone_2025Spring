@@ -29,7 +29,7 @@ set_core_timer:
     ret
 */
 set_core_timer:
-    // Set expired time for 62.5ms, the timer interrupt asserted when CNTP_CVAL_EL0 >= CNTPCT_EL0
+    // Set expired time for 64Hz (15.6ms), the timer interrupt asserted when CNTP_CVAL_EL0 >= CNTPCT_EL0
     mrs x0, cntfrq_el0      // Read the frequency of the system counter
     lsr x0, x0, #6
     msr cntp_tval_el0, x0   // Write the ticks to cntp_tval_el0 that means CNTP_CVAL_EL0 is set to CNTPCT_EL0 + N*system frequency
