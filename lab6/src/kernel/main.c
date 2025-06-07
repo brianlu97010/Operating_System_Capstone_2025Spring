@@ -49,7 +49,7 @@ int video_player_test(void* fdt) {
         return -1;
     }
     
-    init_data->filename = "syscall.img";
+    init_data->filename = "vm.img";
     init_data->initramfs_addr = get_initramfs_address(fdt);
 
     // Create a kernel thread that will load and execute syscall.img
@@ -118,7 +118,7 @@ void main(void* fdt){
     // syscall_test();
     
     // video player test
-    video_player_test(fdt);
+    // video_player_test(fdt);
 
     // Start Simple Shell
     shell();

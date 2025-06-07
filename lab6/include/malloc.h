@@ -101,7 +101,8 @@ void dfree(void* ptr);
 
 /* Demo */
 /* Memory area for buddy system */
-#define BUDDY_MEM_START 0x10000000
+// #define BUDDY_MEM_START 0x10000000
+#define BUDDY_MEM_START 0xFFFF000010000000 // Use the upper address space for buddy system memory
 #define BUDDY_MEM_SIZE  (16 * 1024 * 1024)  /* 16MB */
 void dynamic_allocator_demo();
 

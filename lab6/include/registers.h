@@ -2,7 +2,8 @@
 #define _REGISTERS_H
 
 /* Base physical address of peripherals */
-#define MMIO_BASE               0x3F000000
+// #define MMIO_BASE               0x3F000000
+#define MMIO_BASE               0xFFFF00003F000000 // If there is a hard-coded address(e.g. IO address) in your kernel, you should also set it to the upper address space
 
 /* GPIO registers */ 
 #define GPFSEL1                 (MMIO_BASE+0x00200004)

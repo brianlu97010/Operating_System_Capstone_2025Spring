@@ -6,7 +6,9 @@
 #include "malloc.h"
 #include "mm.h"
 
-static unsigned long initramfs_address = 0x20000000;
+// static unsigned long initramfs_address = 0x20000000;
+static unsigned long initramfs_address = 0xFFFF000020000000;
+
 
 /* The API for other modules set the initramfs_address */
 void set_initramfs_address(unsigned int addr) {

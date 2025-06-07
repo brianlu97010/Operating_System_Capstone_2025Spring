@@ -407,9 +407,6 @@ static inline page_t* find_buddy(buddy_system_t* buddy, page_t* page, unsigned i
 
 
 /* Demo */
-/* Memory area for buddy system demo */
-#define BUDDY_MEM_START 0x10000000
-#define BUDDY_MEM_SIZE  (16 * 1024 * 1024)  /* 16MB */
 
 /* Global buddy system instance */
 extern buddy_system_t buddy;

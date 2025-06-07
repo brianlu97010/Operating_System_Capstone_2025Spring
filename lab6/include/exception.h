@@ -2,7 +2,8 @@
 #define _EXCEPTION_H
 
 
-#define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
+// #define CORE0_IRQ_SRC        0x40000060     // Core 0 interrupt source 
+#define CORE0_IRQ_SRC        0xFFFF000040000060 // Core 0 interrupt source, use the upper address space
 #define TRAP_FRAME_SIZE      272            // Size of trap frame
 
 #ifndef __ASSEMBLER__

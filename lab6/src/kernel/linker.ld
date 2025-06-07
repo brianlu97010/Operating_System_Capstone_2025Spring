@@ -1,6 +1,10 @@
 SECTIONS
 {
-    . = 0x80000;
+    /* Move kernel to upper address space (0xffff000000000000 ~ 0xfffffffffffffffffff) */
+    . = 0xffff000000000000;
+    . += 0x80000;
+    _start = .;
+
     .text.boot : { KEEP(*(.text.boot)) }
     .text : { *(.text) }
 
