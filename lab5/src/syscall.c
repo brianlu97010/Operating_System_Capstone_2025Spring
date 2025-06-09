@@ -285,33 +285,19 @@ void sys_exit() {
 int sys_mbox_call(unsigned int ch, unsigned int *mbox) {
     disable_irq_in_el1();
 
-    unsigned long msg_addr = (unsigned long)mbox;
+    // Get the mailbox size from the first element of the user-provided mailbox buffer 
+    unsigned int mailbox_size = mbox[0];   // mbox[0] represents the buffer size in bytes (including the header values, the end tag and padding)
+    unsigned int mailbox_num = mailbox_size / 4; // Each content in the mailbox buffer is 32 bits (4 bytes), hence the number of elements in the mailbox buffer is mailbox_size / 4
+
+    // Declare a message buffer for the communication between the CPU and GPU
+    volatile unsigned int __attribute__((aligned(16))) mailbox[mailbox_num]; // 35 in the vm.img case
+
+    memcpy((unsigned long)mailbox, (unsigned long)mbox, mailbox_size); // Copy the user-provided mailbox buffer to the kernel space mailbox buffer    
+    mailbox_call(ch, &mailbox);
+    memcpy((unsigned long)mbox, (unsigned long)mailbox, mailbox_size); // Copy the mailbox buffer back to the user-provided mailbox buffer
     
-    // Combine the message address (upper 28 bits) with channel number (lower 4 bits)  
-    msg_addr = (msg_addr & ~0xF) | (ch & 0xF);
-    
-    // Check whether the Mailbox 0 status register’s full flag is set.
-    while( regRead(MAILBOX_STATUS) & MAILBOX_FULL ){
-        // Mailbox is Full: do nothing
-    }
-    // If not, then you can write the data to Mailbox 1 Read/Write register.
-    regWrite(MAILBOX_WRITE, msg_addr);
-    
-    while(1){
-        // Check whether the Mailbox 0 status register’s empty flag is set.
-        while( regRead(MAILBOX_STATUS) & MAILBOX_EMPTY ){
-            // Mailbox is Empty: do nothing
-        }
-        // If not, then you can read from Mailbox 0 Read/Write register.
-        unsigned int response = regRead(MAILBOX_READ);
-    
-        // Check if the value is the same as you wrote in step 1.
-        if((response & 0xF) == ch){
-            return;     // 這邊不要亂加 return 0，加了會狂跳 exception，原因 I don't know ==
-        }
-    }
     enable_irq_in_el1();
-    return 0;
+    return;
 }
 
 void sys_kill(int pid) {
