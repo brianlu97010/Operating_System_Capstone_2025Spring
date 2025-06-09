@@ -31,7 +31,8 @@ primary_core:
     ldr x0, =MAIR_VALUE
     msr mair_el1, x0
     
-    // Setup identity paging
+    /*
+    // Setup identity paging (Two level translation, each entry of PUD points to a 1GB block.)
     // Setup page table base addresses
     mov x0, 0          // PGD at physical address 0x0000
     mov x1, 0x1000     // PUD at physical address 0x1000
@@ -39,10 +40,6 @@ primary_core:
     // Clear PGD, PUD page table memory (init to 0)
     mov x2, #0x2000    // Clear 8KB (2 pages)
     bl clear_page_tables
-    
-    // Reset base addresses
-    // mov x0, 0          // PGD at physical address 0x0000
-    // mov x1, 0x1000     // PUD at physical address 0x1000
     
     // Setup page descriptor of PGD
     ldr x2, =BOOT_PGD_ATTR
@@ -59,9 +56,45 @@ primary_core:
     mov x3, 0x40000000
     orr x3, x2, x3
     str x3, [x1, 8]    // Store to PUD[1] (offset 8 bytes = 64 bites)
+    */
+    
+    // Three level translation: 
+    // 0x0000: PGD (Level 0)
+    // 0x1000: PUD (Level 1) 
+    // 0x2000: PMD for 0x00000000-0x3FFFFFFF (Level 2)
+    // 0x3000: PMD for 0x40000000-0x7FFFFFFF (Level 2)
+    mov x0, 0           // PGD at physical address 0x0000
+    mov x1, 0x1000      // PUD at physical address 0x1000
+    mov x2, 0x2000      // PMD for 0x00000000-0x3FFFFFFF at physical address 0x2000
+    mov x3, 0x3000      // PMD for 0x40000000-0x7FFFFFFF at physical address 0x3000
 
+    // Clear PGD, PUD, PMD page table memory (init to 0)
+    mov x4, #0x4000     // Clear 16KB (4 pages)
+    bl clear_page_tables
+
+    // Setup page descriptor of PGD, point to PUD
+    ldr x4, =BOOT_PGD_ATTR
+    orr x4, x1, x4      // Combine PUD physical address with attributes
+    str x4, [x0]        // Store to the first entry of PGD
+
+    // Setup page descriptor of PUD, cover the physical address: 0x00000000-0x3FFFFFFF
+    ldr x4, =BOOT_PUD_ATTR
+    orr x4, x2, x4      // Combine PMD physical address with attributes
+    str x4, [x1]        // Store to PUD[0]
+
+    // Setup page descriptor of PUD, cover the physical address: 0x40000000-0x7FFFFFFF
+    ldr x4, =BOOT_PUD_ATTR
+    orr x4, x3, x4      // Combine PMD physical address with attributes
+    str x4, [x1, 8]     // Store to PUD[1] (offset 8 bytes = 64 bits)
+
+    // Setup PMD
+    bl setup_ram_pmd
+    
+    // Setup second PMD: Map 0x40000000-0x7FFFFFFF with 2MB blocks  
+    bl setup_local_peripherals_pmd
+    
     // Load PGD to both TTBR0 and TTBR1
-    msr ttbr0_el1, x0  // User space (identity mapping)
+    msr ttbr0_el1, x0  // User space
     msr ttbr1_el1, x0  // Kernel space
     
     ldr x3, =kernel_space_entry // indirect branch to the virtual address  load the kernel space entry point address (will be virtual address, since the symbol is defined in the linker script, and the linker will place it in the virtual address space)
@@ -74,7 +107,7 @@ primary_core:
     br x3
     /*
     // After Enable MMU, all address should in the upper address space 
-    // * 下面這些指令仍在物理空間執行
+    // * 下面這些指令在 phyical address 執行
     // Initialize the stack pointer to 4MB, using the sybmol defined in linker script
     ldr x3, =stack_top
     mov sp, x3
@@ -89,17 +122,17 @@ primary_core:
 
 
 kernel_space_entry:
-    // 🎯 現在我們在核心虛擬空間執行！
+    // After set M bit in SCTLR_EL1, all address will be view as virtual address by CPU
     
     // Initialize the stack pointer using virtual address
-    ldr x3, =stack_top  // 現在這是虛擬地址，可以安全使用
+    ldr x3, =stack_top  // Get the virtual address from linker script
     mov sp, x3
 
     // Procedure call will pass x0 ~ x7 as parameters
-    mov x0, x21         // 恢復 DTB 地址
+    mov x0, x21         // x21 contains the fdt address
 
     // Jump to main function with parameters x0
-    bl main             // 現在可以安全調用虛擬地址的 main
+    bl main             // branch to main function (this symbol is virtual address)
     b busy_loop
 
 busy_loop:
@@ -129,10 +162,80 @@ from_el2_to_el1:
                         // When executed, the PE restores PSTATE from the `SPSR`, and branches to the address held in the `ELR` (primary_core+4)
 
 
+// Setup first GB PMD (0x00000000-0x3FFFFFFF, 2MB blocks)
+setup_ram_pmd:
+    mov x5, 0x2000     // PMD base address
+    mov x6, 0          // Current physical address
+    mov x7, 0          // PMD entry index
+    ldr x8, =RAM_END   // 0x3C000000, end of RAM
+    
+ram_pmd_loop:
+    cmp x7, #512                // Check PMD entry limit
+    b.ge ram_pmd_done
+    
+    // Determine memory attribute based on address
+    cmp x6, x8            // 0x3C000000
+    b.ge use_device_attr_ram    // >= 0x3C000000: Device Memory
+    
+    // Use Normal Memory attribute for RAM (< 0x3C000000)
+    ldr x9, =BOOT_PMD_ATTR_RAM
+    b set_pmd_entry_ram
+    
+use_device_attr_ram:
+    // Use Device Memory for BCM2837 peripherals (>= 0x3C000000)
+    ldr x9, =BOOT_PMD_ATTR_PERIPHERAL
+    
+set_pmd_entry_ram:
+    orr x9, x6, x9              // Combine physical address with attributes
+    str x9, [x5, x7, lsl #3]    // Store to PMD[index]
+    
+    ldr x10, =BLOCK_SIZE_2MB // 2MB block size
+    add x6, x6, x10 // Next 2MB block
+    add x7, x7, #1              // Next PMD entry
+    b ram_pmd_loop              // Continue until 512 entries
+    
+ram_pmd_done:
+    ret
+
+
+
+// Setup local peripheral (0x40000000-0x7FFFFFFF, 2MB blocks, Device Memory)
+setup_local_peripherals_pmd:
+    mov x5, 0x3000              // Second PMD base address
+    mov x6, 0x40000000          // Starting physical address (1GB)
+    mov x7, 0                   // PMD entry index
+    
+local_peripherals_pmd_loop:
+    cmp x7, #512                // PMD has 512 entries
+    b.ge local_peripherals_pmd_done
+    
+    // Use Device Memory attribute for MMIO
+    ldr x8, =BOOT_PMD_ATTR_PERIPHERAL
+    orr x8, x6, x8              // Combine physical address with attributes
+    str x8, [x5, x7, lsl #3]    // Store to PMD[index]
+    
+    ldr x10, =BLOCK_SIZE_2MB // 2MB block size
+    add x6, x6, x10 // Next 2MB block
+    add x7, x7, #1              // Next PMD entry
+    b local_peripherals_pmd_loop
+    
+local_peripherals_pmd_done:
+    ret
+
+
+
+// Clear page table memory
+// x0: start address, x4: size to clear
 clear_page_tables:
-    mov x3, x0         // Start address of PGD (0x0)
+    mov x5, x0          // Current address
+    add x6, x0, x4      // End address
+    
 clear_loop:
-    str xzr, [x3], #8  // Clear 8 bytes and increment
-    subs x2, x2, #8    // Decrement remaining bytes
-    bne clear_loop
+    cmp x5, x6
+    b.ge clear_done
+    str xzr, [x5]       // Store zero
+    add x5, x5, #8      // Next 8 bytes
+    b clear_loop
+    
+clear_done:
     ret
