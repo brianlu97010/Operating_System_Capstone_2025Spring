@@ -25,7 +25,7 @@ typedef struct cpio_newc_header{
  * Round up to a multiple of 4
  * Will be used to align filedata size to 4 bytes 
  */
-unsigned int cpio_padded_size(unsigned int);
+unsigned long cpio_padded_size(unsigned long);
 
 /* Convert ASCII string (stored in hex format) to unsigned int (The New ASCII Format uses 8-byte hexadecimal fields) */
 unsigned int cpio_hex_to_int(const char*, unsigned int);

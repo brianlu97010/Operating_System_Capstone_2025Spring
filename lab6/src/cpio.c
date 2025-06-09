@@ -5,6 +5,8 @@
 #include "sched.h"
 #include "malloc.h"
 #include "mm.h"
+#include "vm.h"
+#include "mmu.h"
 
 // static unsigned long initramfs_address = 0x20000000;
 static unsigned long initramfs_address = 0xFFFF000020000000;
@@ -24,7 +26,7 @@ const void* get_cpio_addr(void) {
  * Round up to a multiple of 4
  * Will be used to align filedata size to 4 bytes 
  */
-inline unsigned int cpio_padded_size(unsigned int size) {
+inline unsigned long cpio_padded_size(unsigned long size) {
     // If the value is the multiple of 4, then its last 2 bits must be 0
     // Add 3 to ensure round "up" tto the next multiple of 4 
     return (size + 3) & ~3;  
@@ -207,7 +209,11 @@ void cpio_exec(const void* cpio_file_addr, const char* file_name){
     return;
 }
 
-// Load the user program from initramfs and copy it to the task's user space
+/**
+ * 從 cpio archive 中找到對應的 user program
+  1.  allocate 一塊 physical memory space 放 user program 的 data，然後將這塊 physical memory space mapping 到 `USER_CODE_BASE 0x0`
+  2.  allocate 一塊 physical memory space 放 user mode 的 stack， 然後將這塊 physical memory space mapping 到 `USER_STACK_BASE 0x0000ffffffffb000`
+ */
 unsigned long cpio_load_program(const void* cpio_file_addr, const char* file_name) {
     const char* current_addr = (const char*)cpio_file_addr;
     cpio_newc_header* header;
@@ -275,22 +281,61 @@ unsigned long cpio_load_program(const void* cpio_file_addr, const char* file_nam
     // Get current task to allocate memory for user program
     struct task_struct* current = (struct task_struct*)get_current_thread();
     
-    // Allocate memory for user program (copy to separate memory space)
+    // Store program size 
+    current->user_program_size = program_size;
+    
+    // Allocate physical memory space for user program
     current->user_program = dmalloc(program_size);
     if (!current->user_program) {
         muart_puts("Error: Failed to allocate memory for user program\r\n");
         return 0;
     }
-    
-    // Store program size for cleanup later
-    current->user_program_size = program_size;
-    
+
     // Copy program from initramfs to allocated memory
     memcpy(current->user_program, program_start_addr, program_size);
+
+    // Mapping the physical memory space of the user program to the user virtual address
+    unsigned long user_program_pa = (unsigned long)VIRT_TO_PHYS(current->user_program);
+    if (mappages(current->pgd, USER_CODE_BASE, program_size, user_program_pa) != 0) {
+        dfree(current->user_program);
+        muart_puts("Error: Failed to map user program to virtual address space\r\n");
+        return 0;
+    }
+    muart_puts("Mapped user program (physical address) : ");
+    muart_send_hex(user_program_pa);
+    muart_puts(" to user virtual address 0x0\r\n");
     
-    muart_puts("Copied program to allocated memory at: ");
-    muart_send_hex((unsigned long)current->user_program);
-    muart_puts("\r\n");
+
+    // Allocate a 16KB memory space for the task's user stack
+    current->user_stack = dmalloc(USER_STACK_SIZE);
+    if (!current->user_stack) {
+        muart_puts("Failed to allocate new task user stack\r\n");
+        return -1;
+    }
+
+    // Initialize user stack to zero
+    memzero((unsigned long)current->user_stack, USER_STACK_SIZE);  
+
+    // Mapping the user stack to the user virtual address
+    unsigned long user_stack_pa = (unsigned long)VIRT_TO_PHYS(current->user_stack);
+    if (mappages(current->pgd, USER_STACK_BASE, USER_STACK_SIZE, user_stack_pa) != 0) {
+        dfree(current->user_program);
+        muart_puts("Error: Failed to map user stack to virtual address space\r\n");
+        return 0;
+    }
+
+    // muart_puts("Mapped user stack: PA ");
+    // muart_send_hex(user_stack_pa);
+    // muart_puts(" -> VA ");
+    // muart_send_hex(USER_STACK_BASE);
+    // muart_puts("\r\n");
+
+    // lab 5 debug msg
+    // muart_puts("Copied program to allocated memory at user: ");
+    // muart_send_hex((unsigned long)current->user_program);
+    // muart_puts("\r\n");
     
-    return (unsigned long)current->user_program;
+    // lab 5
+    // return (unsigned long)current->user_program;
+    return USER_CODE_BASE;  // Return the user virtual address where the program is loaded
 }
