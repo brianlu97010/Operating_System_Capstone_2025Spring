@@ -6,6 +6,7 @@
 #include "timer.h"
 #include "malloc.h"
 #include "sched.h"
+#include "mmu.h"
 
 /* Global buddy system instance */
 buddy_system_t buddy;
@@ -37,7 +38,7 @@ int syscall_test(){
 }
 
 int video_player_test(void* fdt) {
-    muart_puts("Starting system call test with initramfs.cpio program ...\r\n");
+    muart_puts("\r\n========Starting system call test with initramfs.cpio program =========\r\n");
     
     // Create a kernel thread that will move to user mode
     // pid_t pid = kernel_thread(kernel_fork_process, NULL);
@@ -50,7 +51,7 @@ int video_player_test(void* fdt) {
     }
     
     init_data->filename = "vm.img";
-    init_data->initramfs_addr = get_initramfs_address(fdt);
+    init_data->initramfs_addr = PHYS_TO_VIRT(get_initramfs_address(fdt)); // Use the VA in kernel space
 
     // Create a kernel thread that will load and execute syscall.img
     pid_t pid = kernel_thread(kernel_fork_process_cpio, init_data);
