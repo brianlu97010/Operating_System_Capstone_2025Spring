@@ -17,11 +17,12 @@ cpu_switch_to:
     ldp x25, x26, [x1, 16 * 3]
     ldp x27, x28, [x1, 16 * 4]
     ldp fp, lr, [x1, 16 * 5]
+    ldr x9, [x1, 16 * 6]
     mov sp, x9
     msr tpidr_el1, x1
 
     // Load the new thread's PGD physical address
-    ldr x2, [x1, 16 * 7]
+    ldr x2, [x1, 16 * 6 + 8]
 
     // memory barriers to guarantee previous instructions are finished. 
     dsb ish             // ensure write has completed

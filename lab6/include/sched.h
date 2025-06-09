@@ -30,6 +30,7 @@ struct cpu_context {
     unsigned long fp;      // x29
     unsigned long lr;      // x30
     unsigned long sp;
+    unsigned long phy_addr_pgd; // Physical address of the PGD page table
 };
 
 /* Task structure */
@@ -44,6 +45,8 @@ struct task_struct {
     size_t user_program_size;     // Size of user program for cleanup
     struct list_head list;    // For run queue
     struct list_head task;    // For task list
+
+    unsigned long* pgd; // Pointer to the PGD page table
 };
 
 /* Pass initramfs address through task structure */
