@@ -1,277 +1,619 @@
-# OSC 2025 | Lab 5: Thread and User Process
+# OSC 2025 | Lab 7: Virtual File System
 > [!IMPORTANT]
-> Todo :
-> Advanced Exercise 1 - POSIX Signal - 30%
+> **Todo** :  
+> Advanced Exercises 1 - /dev/uart  
+> Advanced Exercises 2 - /dev/framebuffer  
 
+## Overview
 
-## Basic Exercise 1: Thread System - 10%
+這個 lab 實作了一個 Virtual File System (VFS) 介面以及記憶體檔案系統 (tmpfs)，讓 kernel 能夠提供統一的檔案系統介面。VFS 定義了在實體檔案系統上更高一層的 interface，讓 user application 可以透過 VFS 定義好的介面存取底層資料，不用考慮底層是如何實作。
 
-### Thread Creation and Management
+### VFS 架構
 
-The thread system implements fundamental multitasking capabilities with the following components:
-
-**Thread Creation**: Dynamic thread creation with task descriptors and dedicated stacks
-- Each thread has separate kernel and user stacks (4KB each)
-- Task descriptors store CPU context and thread metadata
-- Threads are added to run queue upon creation
-
-**Round-Robin Scheduler**: Fair scheduling algorithm for threads of the same priority
-- `schedule()` function picks next runnable thread from circular run queue
-- Current thread moved to tail if still runnable (round-robin behavior)
-- Idle thread runs when no other threads are runnable
-
-**Context Switching**: Assembly-level CPU context preservation and restoration
-- Only callee-saved registers (x19-x30, sp) are saved/restored
-- Uses system register `tpidr_el1` to store current thread pointer
-- Context switch implemented in `cpu_switch_to()` assembly function
-
-**Thread Lifecycle Management**:
-- Threads can voluntarily yield CPU via `schedule()`
-- Thread exit sets state to ZOMBIE and removes from run queue
-- Idle thread recycles zombie thread resources
-- PID management with bitmap allocation (range: 2-32768)
-
-### Key Components:
-- `sched.c/sched.h`: Core scheduler implementation
-- `sched.S`: Assembly context switching routines  
-- `pid.c/pid.h`: Process ID management with bitmap allocation
-
-
-## Basic Exercise 2: User Process and System Calls - 30%
-
-### System Call Interface
-
-Implements POSIX-like system calls with proper argument passing between user and kernel modes:
-
-**Required System Calls:**
-- `getpid()`: Get current process ID
-- `uart_read(buf, size)`: Read from UART
-- `uart_write(buf, size)`: Write to UART  
-- `exec(name, argv[])`: Execute program from initramfs
-- `fork()`: Create child process
-- `exit()`: Terminate current process
-- `mbox_call(ch, mbox)`: Hardware mailbox communication
-- `kill(pid)`: Terminate specified process
-
-**System Call Convention:**
-- Arguments passed in registers x0-x7
-- System call number in x8
-- Return value in x0
-- Uses `svc #0` instruction to trap to kernel
-
-**Trap Frame Management**: 
-- Registers saved at top of kernel stack during exceptions
-- Proper context preservation for EL0 ↔ EL1 transitions
-- User stack pointer (sp_el0) saved/restored correctly
-
-### Expected Result:
-Fork test should work in EL0, showing:
-- Parent and child processes with different PIDs
-- Proper stack pointer values for each process
-- Child process returns 0, parent gets child PID
-
-## Video Player Test - 40%
-
-### Timer-Driven Preemption
-
-**Core Timer Integration:**
-- Timer interrupt frequency set to core timer frequency >> 5
-- Enables preemptive multitasking between processes
-- User programs can access timer registers in EL0:
-```c
-uint64_t tmp;
-asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
-tmp |= 1;
-asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
+```
+┌─────────────────────────────────────────────────────────┐
+│                 User Applications                       │
+│  ( 呼叫 open, read, write, close 等 syscall)             │
+└─────────────────┬───────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────┐
+│                  VFS Layer                              │
+│  統一的 API: vfs_open(), vfs_read(), vfs_write()...    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │   vnode     │  │   vnode     │  │   vnode     │     │
+│  │ (統一介面)  │  │ (統一介面)  │  │ (統一介面)  │     │
+│  └─────────────┘  └─────────────┘  └─────────────┘     │
+└─────────────────┬───────────────┬───────────────┬───────┘
+                  │               │               │
+┌─────────────────▼─┐  ┌─────────▼──┐  ┌─────────▼────────┐
+│     tmpfs         │  │ initramfs  │  │  Device Files    │
+│  (記憶體檔案系統) │  │ (唯讀)     │  │ (UART/FB)        │
+│                   │  │            │  │                  │
+│ tmpfs_read()      │  │ init_read()│  │ uart_read()      │
+│ tmpfs_write()     │  │ init_write()│  │ uart_write()     │
+│ tmpfs_create()    │  │            │  │ fb_write()       │
+└─────────────────┬─┘  └────────────┘  └──────────────────┘
+                  │
+┌─────────────────▼─┐
+│       RAM         │
+│  實際資料儲存     │
+│  (動態記憶體分配) │
+└───────────────────┘
 ```
 
-**User Program Execution:**
-- Loads `syscall.img` from initramfs 
-- Creates kernel thread that transitions to user mode
-- Executes user program in EL0 with full system call support
+## Data Structure of VFS
 
-**Interactive Features:**
-- User-space shell program with command processing
-- Real-time switching between shell and background tasks
-- Timer interrupts enable responsive multitasking
+### vnode
+每個 file、directory、device 在 VFS 中都用一個 vnode 來代表，提供統一的 interface：
 
-### Expected Result:
-- User program runs fluently in EL0
-- Can switch between shell and child processes
-- Timer-driven preemption allows typing while background tasks run
-- Must demonstrate working on both QEMU and Raspberry Pi with display output
+```c
+struct vnode {
+    struct mount* mount;                    
+    struct vnode_operations* v_ops;         // 跟 vnode 操作有關的 functions (lookup, mkdir, create)
+    struct file_operations* f_ops;          // 跟 file 操作有關的 functions (open, close, read, write, lseek)
+    void* internal;                         // 指向具體 file system 的內部資料結構
+};
+```
 
-## Architecture Details
+### file handle
+同一個 file 可能被多個 user application 同時開啟，需要有個 data structure 叫做 file handle 來記錄目前的狀態：
 
-### Task Structure
+```c
+struct file {
+    struct vnode *vnode;                    // 這個 file handle 實際是紀錄哪一個 file
+    size_t f_pos;                          // 目前的 read/write position
+    struct file_operations *f_ops;         // file operation
+    int flags;                             // 開啟模式（ read/write/create 等）
+};
+```
+
+### mount
+代表一個已經 mounted 的 file system：
+
+```c
+struct mount {
+    struct vnode* root;                     // Each mounted file system has its own root vnode
+    struct filesystem* fs;                  // 這個 mounted filesystem instance 是哪一個 file system
+};
+```
+
+## Basic Exercise 1 - Root File System
+
+### 目標
+實作 tmpfs 作為 root file system，提供基本的檔案操作功能。
+
+### 實作重點
+
+#### 1. File System Registration
+```c
+static struct filesystem tmpfs_filesystem = {
+    .name = "tmpfs",
+    .setup_mount = tmpfs_setup_mount
+};
+
+int init_tmpfs(void) {
+    return register_filesystem(&tmpfs_filesystem);
+}
+```
+
+每個 file system 都要註冊到 VFS 的 `registered_fs` array 中：
+
+```c
+static struct filesystem* registered_fs[MAX_FILESYSTEMS];
+static int fs_count = 0;
+
+int register_filesystem(struct filesystem* fs) {
+    // 檢查是否重複註冊
+    for (int i = 0; i < fs_count; i++) {
+        if (strcmp(registered_fs[i]->name, fs->name) == 0) {
+            return VFS_EEXIST;
+        }
+    }
+    
+    // 註冊到 kernel
+    registered_fs[fs_count++] = fs;
+    return VFS_OK;
+}
+```
+
+#### 2. Root File System Setup
+```c
+int setup_root_filesystem(void) {
+    // 1. 註冊 tmpfs 到 kernel
+    int ret = init_tmpfs();
+    
+    struct mount* root_mount = dmalloc(sizeof(struct mount));
+    
+    // 2. 直接呼叫 tmpfs 的 setup_mount
+    struct filesystem* tmpfs_fs = find_filesystem("tmpfs");
+    ret = tmpfs_fs->setup_mount(tmpfs_fs, root_mount);
+    
+    // 3. 設為 global 的 root file system
+    rootfs = root_mount;
+    
+    return VFS_OK;
+}
+```
+
+#### 3. tmpfs 內部資料結構
+```c
+struct tmpfs_inode {
+    int type;  // TMPFS_TYPE_FILE or TMPFS_TYPE_DIR
+    
+    union {
+        // For files: data storage
+        struct tmpfs_file {
+            char data[TMPFS_MAX_FILE_SIZE];
+            size_t size;  // Current file size
+        }tmpfs_file;
+        
+        // For directories: directory entries
+        struct tmpfs_dir {
+            struct tmpfs_dirent entries[TMPFS_MAX_ENTRIES];
+            int entry_count;
+        }tmpfs_dir;
+    };
+    
+    struct vnode* vnode;  // Back reference to vnode
+};
+```
+
+#### 4. 核心操作實作
+
+**File Open:**
+```c
+static int tmpfs_open(struct vnode* file_node, struct file** target, int flags) {
+    // Create file handle
+    struct file* file = (struct file*)dmalloc(sizeof(struct file));
+    
+    // Initialize file handle
+    file->vnode = file_node;
+    file->f_pos = 0;
+    file->f_ops = file_node->f_ops;
+    file->flags = flags;
+    
+    *target = file;
+    return VFS_OK;
+}
+```
+
+**File Read/Write:**
+```c
+static int tmpfs_read(struct file* file, void* buf, size_t len) {
+    struct tmpfs_inode* inode = (struct tmpfs_inode*)file->vnode->internal;
+    
+    size_t available = inode->tmpfs_file.size - file->f_pos;
+    size_t to_read = (len < available) ? len : available;
+    
+    memcpy(buf, &inode->tmpfs_file.data[file->f_pos], to_read);
+    file->f_pos += to_read;
+    
+    return to_read;
+}
+
+static int tmpfs_write(struct file* file, const void* buf, size_t len) {
+    struct tmpfs_inode* inode = (struct tmpfs_inode*)file->vnode->internal;
+    
+    if (file->f_pos + len > TMPFS_MAX_FILE_SIZE) {
+        len = TMPFS_MAX_FILE_SIZE - file->f_pos;
+    }
+    
+    memcpy(&inode->tmpfs_file.data[file->f_pos], buf, len);
+    file->f_pos += len;
+    
+    if (file->f_pos > inode->tmpfs_file.size) {
+        inode->tmpfs_file.size = file->f_pos;
+    }
+    
+    return len;
+}
+```
+
+## Basic Exercise 2 - Multi-level VFS
+
+### 目標
+實作多層級目錄結構和檔案系統掛載功能。
+
+### 實作重點
+
+#### 1. Directory Creation
+```c
+static int tmpfs_mkdir(struct vnode* dir_node, struct vnode** target, const char* component_name) {
+    struct tmpfs_inode* dir_inode = (struct tmpfs_inode*)dir_node->internal;
+
+    // 找到空的 directory entry
+    int free_slot = -1;
+    for (int i = 0; i < TMPFS_MAX_ENTRIES; i++) {
+        if (!dir_inode->tmpfs_dir.entries[i].used) {
+            free_slot = i;
+            break;
+        }
+    }
+
+    // Create new directory vnode
+    struct vnode* new_dir_vnode = tmpfs_create_vnode(TMPFS_TYPE_DIR);
+
+    // Add to parent directory
+    struct tmpfs_dirent* entry = &dir_inode->tmpfs_dir.entries[free_slot];
+    strncpy(entry->name, component_name, TMPFS_MAX_NAME);
+    entry->inode = (struct tmpfs_inode*)new_dir_vnode->internal;
+    entry->used = 1;
+    dir_inode->tmpfs_dir.entry_count++;
+    
+    *target = new_dir_vnode;
+    return VFS_OK;
+}
+```
+
+#### 2. Pathname Lookup
+核心的路徑解析功能，支援跨檔案系統的查找：
+
+```c
+int vfs_lookup(const char* pathname, struct vnode** target) {
+    // 從 root file system 的 root vnode 開始
+    struct vnode* current = rootfs->root;     
+    char component[256];
+    int pos = 0;
+    
+    while ((pos = parse_path_component(pathname, pos, component, sizeof(component))) > 0) {
+        struct vnode* next = NULL;
+        int ret = current->v_ops->lookup(current, &next, component);
+        if (ret != VFS_OK) {
+            return ret;
+        }
+        current = next;
+
+        // 如果遇到 mounting point，跳躍到被掛載的檔案系統
+        if (current && current->mount != NULL) {
+            current = current->mount->root;
+        }
+    }
+
+    *target = current;
+    return VFS_OK;
+}
+```
+
+#### 3. File System Mounting
+```c
+int vfs_mount(const char* target, const char* filesystem) {
+    // 找到要掛載的檔案系統
+    struct filesystem* fs = find_filesystem(filesystem);
+
+    // 找到掛載點 vnode
+    struct vnode* mount_point = NULL;
+    int ret = vfs_lookup(target, &mount_point);
+
+    // 建立 mount structure
+    struct mount* mount_fs = dmalloc(sizeof(struct mount));
+    ret = fs->setup_mount(fs, mount_fs);
+
+    // 更新掛載點 vnode
+    mount_point->mount = mount_fs;
+
+    return VFS_OK;
+}
+```
+
+#### 4. File Creation with Path
+```c
+int vfs_open(const char* pathname, int flags, struct file** target) {
+    struct vnode* vnode = NULL;
+    int ret = vfs_lookup(pathname, &vnode);
+    
+    // 如果檔案不存在且要求創建
+    if ((ret == VFS_ENOENT) && (flags & O_CREAT)) {
+        int last_slash_pos = find_last_slash(pathname);
+        char* file_name = pathname + last_slash_pos + 1;
+    
+        // 建立父目錄路徑
+        char dir_pathname[256];
+        if (last_slash_pos == 0) {
+            strcpy(dir_pathname, "/");
+        } else {
+            strncpy(dir_pathname, pathname, last_slash_pos);
+            dir_pathname[last_slash_pos] = '\0';
+        }
+
+        // 找到父目錄 vnode
+        struct vnode* parent_vnode = NULL;
+        ret = vfs_lookup(dir_pathname, &parent_vnode);
+
+        // 在父目錄中創建檔案
+        ret = parent_vnode->v_ops->create(parent_vnode, &vnode, file_name);
+    }
+    
+    return vnode->f_ops->open(vnode, target, flags);
+}
+```
+
+## Basic Exercise 3 - Multitask VFS
+
+### 目標
+為每個 task 提供獨立的檔案描述符表和當前工作目錄。
+
+### 實作重點
+
+#### 1. Task File Descriptor Table
 ```c
 struct task_struct {
-    struct cpu_context cpu_context;  // Saved registers
-    pid_t pid;                      // Process ID  
-    int state;                      // RUNNING/ZOMBIE/DEAD
-    struct task_struct* parent;     // Parent process
-    void* kernel_stack;             // Kernel mode stack
-    void* user_stack;               // User mode stack  
-    void* user_program;             // User program memory
-    size_t user_program_size;       // Program size
-    struct list_head list;          // Run queue linkage
-    struct list_head task;          // Task list linkage
+    // ... 其他成員
+    char cwd[MAX_PATH_LENGTH];                      // Current working directory
+    struct file* fd_table[MAX_OPEN_FILES];          // File descriptor table
 };
 ```
 
-### Exception Handling
-- Exception vector table handles synchronous/asynchronous exceptions
-- Separate handlers for EL0 and EL1 exceptions
-- Timer and UART interrupt support
-- Proper privilege level transitions
-
-## Building and Testing
-
-### Prerequisites
-- ARM64 cross-compiler toolchain
-- QEMU ARM system emulation or Raspberry Pi 3 hardware
-- Python 3 for kernel transmission utilities
-
-### Build Instructions
-```bash
-make clean && make
-```
-
-### Running
-```bash
-# For QEMU testing
-make qemu
-
-# For Raspberry Pi deployment  
-python3 send_kernel.py kernel8.img /dev/ttyUSB0
-```
-
-
-## Source Organization
-
-### Core Components
-- `sched.c/h`: Thread scheduler and process management
-- `syscall.c/h`: System call implementations
-- `exception.c/S`: Exception handling and privilege transitions
-- `malloc.c/h`: Memory allocation subsystem
-- `timer.c/S`: Core timer and interrupt handling
-
-### Hardware Abstraction  
-- `muart.c/h`: Mini UART driver
-- `async_uart.c/h`: Asynchronous UART with interrupts
-- `mailbox.c/h`: VideoCore mailbox interface
-- `registers.h`: Hardware register definitions
-
-### Utilities
-- `cpio.c/h`: Initramfs archive handling
-- `fdt.c/h`: Device tree parsing
-- `string.c/h`: String manipulation functions
-- `list.h`: Circular doubly-linked list implementation
-
-## Fork System Call Implementation Details
-
-### Fork Implementation Overview
-
-The fork system call creates a child process by duplicating the parent process. The implementation follows these key steps:
-
-#### Memory Management
-Copy the parent's kernel stack and user stack data to child's kernel stack and user stack:
+#### 2. VFS Task Initialization
 ```c
-// Copy the stacks
-memcpy(child->kernel_stack, parent->kernel_stack, THREAD_STACK_SIZE);
-memcpy(child->user_stack, parent->user_stack, THREAD_STACK_SIZE);
+int vfs_task_init(struct task_struct* task) {
+    // 初始化檔案描述符表
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        task->fd_table[i] = NULL;
+    }
+
+    strcpy(task->cwd, "/");  // 設定當前工作目錄為 root
+    return VFS_OK;
+}
 ```
 
-Child's user program shares with parent's user program:
+#### 3. System Call Implementation
+
+**open system call:**
 ```c
-child->user_program = parent->user_program;  // Share user program pointer
-child->user_program_size = parent->user_program_size; 
+int open(const char *pathname, int flags) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    
+    // 計算絕對路徑
+    char abs_path[MAX_PATH_LENGTH];
+    strcpy(abs_path, pathname);
+    get_abs_path(abs_path, current->cwd);
+
+    // 分配檔案描述符
+    int fd = allocate_fd(current);
+
+    // 呼叫 vfs_open 開啟檔案
+    struct file* file;
+    int ret = vfs_open(abs_path, flags, &file);
+    if (ret != VFS_OK) {
+        return ret;
+    }
+
+    // 儲存到檔案描述符表
+    current->fd_table[fd] = file;
+    return fd;
+}
 ```
 
-#### Trap Frame Management
-Copy the parent's trap frame data to child's trap frame, including:
+**read/write system calls:**
 ```c
-struct trap_frame {
-    unsigned long regs[31];     // General purpose registers x0-x30
-    unsigned long sp_el0;       // Stack pointer
-    unsigned long elr_el1;      // Program counter
-    unsigned long spsr_el1;     // Processor state
+long read(int fd, void *buf, unsigned long count) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    struct file* file = current->fd_table[fd];
+    return vfs_read(file, buf, count);
+}
+
+long write(int fd, const void *buf, unsigned long count) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    struct file* file = current->fd_table[fd];
+    return vfs_write(file, buf, count);
+}
+```
+
+#### 4. Path Resolution
+支援相對路徑和絕對路徑：
+
+```c
+void get_abs_path(char *path, char *cwd) {
+    // 如果不是絕對路徑，與當前工作目錄結合
+    if (path[0] != '/') { 
+        char tmp[MAX_PATH_LENGTH];
+        strcpy(tmp, cwd);
+        if (strcmp(cwd, "/") != 0) {
+            strcat(tmp, "/");
+        }
+        strcat(tmp, path);
+        strcpy(path, tmp);
+    }
+    
+    // 處理 ".." 和 "." 
+    char abs_path[MAX_PATH_LENGTH + 1];
+    memzero(abs_path, sizeof(abs_path));
+    int idx = 0;
+    
+    for (int i = 0; i < strlen(path); i++) {
+        if (path[i] == '/' && path[i + 1] == '.' && path[i + 2] == '.') {
+            // 回到上一層目錄
+            for (int j = idx; j >= 0; j--) {
+                if (abs_path[j] == '/') {
+                    abs_path[j] = 0;
+                    idx = j;
+                    break;
+                }
+            }
+            i += 2;
+            continue;
+        }
+
+        if (path[i] == '/' && path[i + 1] == '.') {
+            // 跳過當前目錄
+            i++;
+            continue;
+        }
+
+        abs_path[idx++] = path[i];
+    }
+    
+    strcpy(path, abs_path);
+}
+```
+
+#### 5. Change Directory
+```c
+int chdir(const char *path) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    
+    char abs_path[MAX_PATH_LENGTH];
+    strcpy(abs_path, path);
+    get_abs_path(abs_path, current->cwd);
+    strcpy(current->cwd, abs_path);
+    
+    return 0;
+}
+```
+
+## Basic Exercise 4 - /initramfs
+
+### 目標
+實作 initramfs 唯讀檔案系統，並掛載到 `/initramfs`。
+
+### 實作重點
+
+#### 1. initramfs 資料結構
+```c
+struct initramfs_entry {
+    char* name;                             // File name
+    char* data;                            // File content (NULL for directories)
+    size_t size;                           // File size
+    int type;                              // INITRAMFS_TYPE_FILE or INITRAMFS_TYPE_DIR
+    struct vnode* vnode;                   // Back reference to vnode
+};
+
+struct initramfs_fs {
+    struct initramfs_entry* entries;
+    int entry_count;
+    int max_entries;
 };
 ```
 
-When the child process returns to user mode:
+#### 2. CPIO Archive Parsing
 ```c
-ret_to_user:
-    bl disable_irq_in_el1
-    kernel_exit 0
+static int parse_cpio_to_entries(void) {
+    const void* cpio_addr = get_cpio_addr();
+    const char* current_addr = (const char*)cpio_addr;
+    
+    // 第一遍：計算檔案數量
+    int entry_count = 0;
+    while(1) {
+        cpio_newc_header* header = (cpio_newc_header*)current_addr;
+        unsigned int pathname_size = cpio_hex_to_int(header->c_namesize, 8);
+        unsigned int filedata_size = cpio_hex_to_int(header->c_filesize, 8);
+        const char *pathname = current_addr + sizeof(cpio_newc_header);
+
+        if (strcmp(pathname, CPIO_TRAILER) == 0) {
+            break;
+        }
+        
+        if (strcmp(pathname, ".") != 0) {
+            entry_count++;
+        }
+
+        // Move to next entry
+        unsigned long data_start = (unsigned long)current_addr + sizeof(cpio_newc_header) + pathname_size;
+        data_start = cpio_padded_size(data_start);
+        unsigned long next_header = data_start + filedata_size;
+        next_header = cpio_padded_size(next_header);
+        current_addr = (const char*)next_header;
+    }
+    
+    // 分配 entries array
+    g_initramfs->entries = (struct initramfs_entry*)dmalloc(sizeof(struct initramfs_entry) * entry_count);
+    g_initramfs->max_entries = entry_count;
+    
+    // 第二遍：填入資料
+    // ... 解析並建立 initramfs_entry
+}
 ```
 
-It uses this trap frame to restore its status. We need to modify the sp_el0 to let the child thread switch to user mode and use its own user stack:
+#### 3. Read-only Operations
 ```c
-unsigned long parent_sp_offset = parent_tf->sp_el0 - (unsigned long)parent->user_stack;
-child_tf->sp_el0 = (unsigned long)child->user_stack + parent_sp_offset;
+// initramfs 的所有寫入操作都會失敗
+static int initramfs_create(struct vnode* dir_node, struct vnode** target, const char* component_name) {
+    return VFS_ERROR;  // Read-only filesystem
+}
+
+static int initramfs_mkdir(struct vnode* dir_node, struct vnode** target, const char* component_name) {
+    return VFS_ERROR;  // Read-only filesystem
+}
+
+static int initramfs_write(struct file* file, const void* buf, size_t len) {
+    return VFS_ERROR;  // Read-only filesystem
+}
 ```
 
-Then set the return value of fork system call:
+#### 4. initramfs Mounting
 ```c
-child_tf->regs[0] = 0;  // Child returns 0
+int init_initramfs(void) {    
+    // 註冊 initramfs 到 kernel
+    int ret = register_filesystem(&initramfs_filesystem);
+    
+    // 建立掛載點目錄 "/initramfs"
+    ret = vfs_mkdir("/initramfs");
+    
+    // 掛載 initramfs
+    ret = vfs_mount("/initramfs", "initramfs");
+    
+    return VFS_OK;
+}
 ```
 
-#### CPU Context Setup
-Set up the child thread's cpu context:
+#### 5. File Access via VFS
+掛載完成後，可以透過 VFS 介面存取 initramfs 中的檔案：
+
 ```c
-memzero((unsigned long)&child->cpu_context, sizeof(struct cpu_context));
-child->cpu_context.lr = (unsigned long)ret_to_user; 
-child->cpu_context.sp = (unsigned long)child_tf;
+// 透過 exec system call 執行 initramfs 中的程式
+int sys_exec(const char* name, char *const argv[]) {
+    struct task_struct* current = (struct task_struct*)get_current_thread();
+    struct file* program_file = NULL;
+    
+    // 使用 VFS 開啟程式檔案
+    ret = vfs_open(name, O_RDONLY, &program_file);
+    
+    // 取得檔案大小
+    long file_size = vfs_lseek64(program_file, 0, SEEK_END);
+    vfs_lseek64(program_file, 0, SEEK_SET);
+    
+    // 分配記憶體並讀取程式
+    current->user_program = dmalloc(file_size);
+    long bytes_read = vfs_read(program_file, current->user_program, file_size);
+    
+    vfs_close(program_file);
+    
+    // 設定 trap frame 執行新程式
+    struct trap_frame* regs = task_tf(current);
+    regs->elr_el1 = (unsigned long)current->user_program;
+    regs->sp_el0 = (unsigned long)current->user_stack + THREAD_STACK_SIZE;
+    
+    return 0;
+}
 ```
 
-This is for when the scheduler picks up the child thread, it will call `cpu_switch_to` to restore its cpu context:
-```assembly
-cpu_switch_to:
-    // Save the current thread's context
-    stp x19, x20, [x0, 16 * 0]
-    stp x21, x22, [x0, 16 * 1]
-    stp x23, x24, [x0, 16 * 2]
-    stp x25, x26, [x0, 16 * 3]
-    stp x27, x28, [x0, 16 * 4]
-    stp fp, lr, [x0, 16 * 5]
-    mov x9, sp
-    str x9, [x0, 16 * 6]
 
-    // Load the next thread's context
-    ldp x19, x20, [x1, 16 * 0]
-    ldp x21, x22, [x1, 16 * 1]
-    ldp x23, x24, [x1, 16 * 2]
-    ldp x25, x26, [x1, 16 * 3]
-    ldp x27, x28, [x1, 16 * 4]
-    ldp fp, lr, [x1, 16 * 5]
-    ldr x9, [x1, 16 * 6]
-    mov sp, x9
-    msr tpidr_el1, x1 
-    ret
+### 遇到 mounting point ，跳到 mounted file system 的 root
+```
+路徑: "/initramfs/config.txt"
+
+1. 從 tmpfs 根目錄開始
+2. 查找 "initramfs" → 找到 tmpfs 中的目錄
+3. 檢查該目錄是否為掛載點 → 是！
+4. 跳躍到 initramfs 檔案系統的根目錄
+5. 在 initramfs 中查找 "config.txt" → 找到檔案
+6. 返回該檔案的 vnode
 ```
 
-Hence we need to modify `lr` and `sp` registers when creating child thread:
-```c
-child->cpu_context.lr = (unsigned long)ret_to_user; 
-child->cpu_context.sp = (unsigned long)child_tf;
+### 完整的檔案系統層次
 ```
-
-After `cpu_switch_to` executed, it will `ret` to `child->cpu_context.lr` i.e, `ret_to_user`:
-```assembly
-ret_to_user:
-    bl disable_irq_in_el1
-    kernel_exit 0
+tmpfs (主檔案系統 - rootfs):           
+    /                           
+    ├── tmp/                    (tmpfs directory)
+    ├── usr/                    (tmpfs directory)
+    │   └── bin/               (tmpfs directory)
+    ├── home/                  (tmpfs directory)
+    │   └── user/              (tmpfs directory)
+    │       ├── readme.txt     (tmpfs file)
+    │       └── documents/     (tmpfs directory)
+    └── initramfs/  ← 掛載點   
+        └─→ (進入 initramfs 檔案系統)
+            ├── config.txt     (initramfs file - read only)
+            ├── vfs1.img       (initramfs file - read only)
+            └── syscall.img    (initramfs file - read only)
 ```
-
-It restores the trap frame of child thread's trap frame:
-```c
-struct trap_frame {
-    unsigned long regs[31];     // Same as parent's thread
-    unsigned long sp_el0;       // child's user stack pointer
-    unsigned long elr_el1;      // Same as parent's thread
-    unsigned long spsr_el1;     // EL0t
-};
-```
-
-After `eret`, it returns to the `elr_el1` i.e, the user program where trigger the exception `svc` and continues executing the user program using user thread's own user stack.
