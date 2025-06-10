@@ -9,6 +9,7 @@
 #include "syscall.h"
 #include "cpio.h"
 #include "mm.h"
+#include "vm.h"
 
 /* Thread Mechanism Progress : 
  * use `kernel_thread` to create a new thread and add it to run queue
@@ -71,13 +72,16 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
         return -1;
     }
 
-    // Allocate a memory space for the task's user stack
-    new_task->user_stack = dmalloc(THREAD_STACK_SIZE);
-    if (!new_task->user_stack) {
-        muart_puts("Failed to allocate new task user stack\r\n");
+    // Allocate a memory space for the task's user PGD page table
+    new_task->pgd = dmalloc(PAGE_SIZE);
+    if (!new_task->pgd) {
+        pid_free(new_task->pid);
+        dfree(new_task->kernel_stack);
+        dfree(new_task);
         enable_irq_in_el1();
-        return -1;
     }
+    // Initialze the content in PGD to zero
+    memzero((unsigned long)new_task->pgd, PAGE_SIZE);
 
     // Initialize user program fields
     new_task->user_program = NULL;        // Will be set by cpio_load_program
@@ -87,7 +91,10 @@ pid_t kernel_thread(thread_func_t fn, void* arg) {
     new_task->cpu_context.sp = (unsigned long)((char*)new_task->kernel_stack + THREAD_STACK_SIZE);          // Set the stack pointer point to the top of the task's kernel stack
     new_task->cpu_context.lr = (unsigned long)ret_from_kernel_thread;                                       // Set the link register store the address of ret_from_kernel_thread
     new_task->cpu_context.x19 = (unsigned long)fn;                                                          // Store the function address into the callee-saved register
-    new_task->cpu_context.x20 = (unsigned long)arg;                                                         // Store the function argurment into the callee-saved register
+    new_task->cpu_context.x20 = (unsigned long)arg;     
+    
+    // Store the physical address of the PGD page table into the cpu context
+    new_task->cpu_context.phy_addr_pgd = (unsigned long)VIRT_TO_PHYS(new_task->pgd);
 
     // Add the new task into the run queue
     INIT_LIST_HEAD(&new_task->list);
@@ -244,6 +251,14 @@ void idle_task_fn(){
                     zombie->user_program = NULL;
                     zombie->user_program_size = 0;
                 }
+
+                
+                // Free the zombie task's page table
+                if (zombie->pgd) {
+                    clear_pagetable(zombie->pgd); // Clear the page table
+                    dfree(zombie->pgd);
+                    zombie->pgd = NULL;
+                }
                 
                 // Free the zombie task's pid
                 pid_free(zombie->pid);
@@ -379,30 +394,39 @@ int move_to_user_mode(unsigned long user_program_addr) {
     memzero((unsigned long)regs, sizeof(*regs));
     
     // Debug user function address
-    muart_puts("User function address check:\r\n");
-    muart_puts("Function address: ");
+    muart_puts("User virtual address check: ");
     muart_send_hex((unsigned int)user_program_addr);
-    muart_puts("\r\n");
+    muart_puts("\r\n");    
     
-    // muart_puts("First bytes of function: ");
-    // unsigned char* func = (unsigned char*)pc;
-    // for (int i = 0; i < 8; i++) {
-    //     muart_send_hex(func[i]);
-    //     muart_puts(" ");
-    // }
-    // muart_puts("\r\n");
-    
+    // mapping the VA 0x3c000000 ~ 0x3fffffff in user mode to PA 0x3c000000 ~ 0x3fffffff (identity mapping)
+    if (mappages(current->pgd, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START) != 0) {
+        muart_puts("Error: Failed to map peripheral memory to user virtual address space\r\n");
+    }
 
+    /* move_to_user_mode() 也要 update TTBR0_EL1
+        - 從 kernel mode 切換到 user mode
+        - 確保 MMU 使用這個 task 的 user PGD page table 
+        - 在 eret 之前載入，這樣 user mode 才能正確 translate VA to PA
+    */
+    unsigned long pgd_pa = current->cpu_context.phy_addr_pgd;
+
+    
     __asm__(
-        "msr tpidr_el1, %0\n\t" // Hold the "kernel(el1)" thread structure information
-        "msr elr_el1, %1\n\t"   // Store the user function address into elr_el1
-        "msr sp_el0, %2\n\t"
-        "mov sp, %3\n\t"        // stack pointer set to the top of the task's kernel stack
+        "dsb ish\n\t"
+        "msr ttbr0_el1, %0\n\t" // Set the TTBR0_EL1 to the PA of the current task's PGD page table 
+        "tlbi vmalle1is\n\t"
+        "dsb ish\n\t"
+        "isb\n\t"
+        "msr tpidr_el1, %1\n\t" // Store the current task pointer into TPIDR_EL1
+        "msr elr_el1, %2\n\t"   // Store the user function address 0x0 (VA) into elr_el1
+        "msr sp_el0, %3\n\t"    // Set the stack pointer for user mode to VA 0x3f000000 (USER_STACK_TOP)
+        "mov sp, %4\n\t"        // stack pointer set to the top of the task's kernel stack
         "msr spsr_el1, xzr\n\t"   // Enable interrupt in EL0 and use user's stack pointer
         "eret\n\t" ::           // Switch to EL0, jump to elr_el1 (user program address)
+        "r"(pgd_pa),
         "r"(current),
         "r"(user_program_addr), 
-        "r"(current->user_stack + THREAD_STACK_SIZE),
+        "r"(USER_STACK_TOP),
         "r"(current->kernel_stack + THREAD_STACK_SIZE)
     ); 
 
@@ -520,7 +544,7 @@ void kernel_fork_process_cpio(void* arg) {
     muart_puts("\r\n");
     muart_puts("Loading ");
     muart_puts(init_data->filename);
-    muart_puts(" from initramfs at ");
+    muart_puts(" from initramfs at VA ");
     muart_send_hex(init_data->initramfs_addr);
     muart_puts("\r\n");
     
@@ -530,17 +554,15 @@ void kernel_fork_process_cpio(void* arg) {
     // Free initialization data
     dfree(init_data);
     
-    if (user_program_addr == 0) {
-        muart_puts("Error: Failed to load program from initramfs\r\n");
-        call_sys_exit();
-        return;
-    }
-    
-    muart_puts("Successfully loaded program at address: ");
-    muart_send_hex((unsigned int)user_program_addr);
-    muart_puts("\r\n");
+    // lab 5 debug msg
+    // muart_puts("Successfully loaded program at address: ");
+    // muart_send_hex((unsigned int)user_program_addr);
+    // muart_puts("\r\n");
     
     // Move to user mode
+    // int err = move_to_user_mode(user_program_addr);
+
+    // lab 6, using the user virtual address 0x0
     int err = move_to_user_mode(user_program_addr);
     if (err < 0) {
         muart_puts("Error while moving process to user mode\r\n");
