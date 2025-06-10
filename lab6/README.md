@@ -3,6 +3,7 @@
 > Todo :
 > Advanced Exercise 1 - 
 
+## Basic Exercise 1 - Virtual Memory in Kernel Space
 Three level translation
 Each page table has 512 entries
 * First 1GB memory space  (RAM and GPU peripherals)
@@ -11,6 +12,7 @@ Each page table has 512 entries
 * Second 1GB memory space 
   * 0x40000000 ~ 0x7fffffff : Device memory nGnRnE
 
+## Basic Exercise 2 - Virtual Memory in User Space 
 ### PGD Allocation
 To isolate user processes, you should create an address space for each of them. Hence, the kernel should allocate one PGD for each process when it creates a process.
 
