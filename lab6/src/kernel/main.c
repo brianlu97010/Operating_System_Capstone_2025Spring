@@ -119,7 +119,7 @@ void main(void* fdt){
     // syscall_test();
     
     // video player test
-    // video_player_test(fdt);
+    video_player_test(fdt);
 
     // Start Simple Shell
     shell();
