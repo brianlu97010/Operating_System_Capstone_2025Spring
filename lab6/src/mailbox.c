@@ -4,7 +4,7 @@
 #include "muart.h"
 
 void mailbox_call(unsigned int channel, volatile unsigned int* msg){
-    unsigned long msg_addr = (unsigned long)msg;
+    volatile unsigned int msg_addr = (volatile unsigned int)msg;
     
     // Combine the message address (upper 28 bits) with channel number (lower 4 bits)  
     msg_addr = (msg_addr & ~0xF) | (channel & 0xF);

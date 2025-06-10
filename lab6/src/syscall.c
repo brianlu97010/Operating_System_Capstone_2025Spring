@@ -12,6 +12,8 @@
 #include "pid.h"
 #include "registers.h"
 #include "utils.h"
+#include "vm.h"
+#include "mailbox.h"
 
 
 void syscall_handler(struct trap_frame* tf) {
@@ -76,6 +78,8 @@ size_t sys_uartwrite(const char buf[], size_t size) {
 
 
 int sys_exec(const char* name, char *const argv[]) {
+    disable_irq_in_el1();
+
     struct task_struct* current = (struct task_struct*)get_current_thread();
     
     // Clean up current user program
@@ -84,20 +88,23 @@ int sys_exec(const char* name, char *const argv[]) {
         current->user_program = NULL;
         current->user_program_size = 0;
     }
+
+    current->user_stack = NULL;
+    current->user_program = NULL;
+    current->user_program_size = 0;
     
     // Load new program from initramfs
     const void* initramfs_addr = get_cpio_addr();
+    
+    // Checke if initramfs address is VA or PA, if PA, convert it to VA in kernel space
+    if ((unsigned long)(initramfs_addr) < KERNEL_VA_BASE) {
+        initramfs_addr = (const void*)(PHYS_TO_VIRT(initramfs_addr));
+    }
     unsigned long new_program_addr = cpio_load_program(initramfs_addr, name);
 
-    if (!new_program_addr) {
-        muart_puts("Error: Failed to load program: ");
-        muart_puts(name);
-        muart_puts("\r\n");
-        return -1;
+    if (mappages(current->pgd, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START) != 0) {
+        muart_puts("Error: Failed to map peripheral memory to user virtual address space\r\n");
     }
-
-    // Disable interrupts when updating the trap frame
-    disable_irq_in_el1();
 
     // Update trap frame to start executing new program
     struct trap_frame* regs = task_tf(current);
@@ -106,8 +113,8 @@ int sys_exec(const char* name, char *const argv[]) {
     memzero((unsigned long)regs, sizeof(*regs));
     
     // Set new program entry point
-    regs->elr_el1 = new_program_addr;
-    regs->sp_el0 = (unsigned long)current->user_stack + THREAD_STACK_SIZE;
+    regs->elr_el1 = USER_CODE_BASE;
+    regs->sp_el0 = USER_STACK_TOP;  
     regs->spsr_el1 = 0;  // EL0t mode
     
     enable_irq_in_el1();
@@ -152,7 +159,7 @@ int sys_fork() {
     }
     
     // Allocate user stack for child
-    child->user_stack = dmalloc(THREAD_STACK_SIZE);
+    child->user_stack = dmalloc(USER_STACK_SIZE);
     if (!child->user_stack) {
         dfree(child->kernel_stack);
         pid_free(child->pid);
@@ -161,27 +168,71 @@ int sys_fork() {
         enable_irq_in_el1();
         return -1;
     }
+    memzero((unsigned long)child->user_stack, USER_STACK_SIZE);  // Initialize user stack to zero
 
-    // Copy the stacks
-    memcpy(child->kernel_stack, parent->kernel_stack, THREAD_STACK_SIZE);
-    memcpy(child->user_stack, parent->user_stack, THREAD_STACK_SIZE);
+    // Allocate a memory space for the task's user PGD page table
+    child->pgd = dmalloc(PAGE_SIZE);
+    if (!child->pgd) {
+        pid_free(child->pid);
+        dfree(child->kernel_stack);
+        dfree(child->user_stack);
+        dfree(child);
+        enable_irq_in_el1();
+        return -1;
+    }
+    // Initialze the content in PGD to zero
+    memzero((unsigned long)child->pgd, PAGE_SIZE);
 
-    child->user_program = parent->user_program;  // Share user program pointer
+    // Allocate a physical memory space for the user program
     child->user_program_size = parent->user_program_size; 
+    child->user_program = dmalloc(child->user_program_size);
+    if (!child->user_program) {
+        pid_free(child->pid);
+        dfree(child->kernel_stack);
+        dfree(child->user_stack);
+        dfree(child);
+        dfree(child->pgd);
+        enable_irq_in_el1();
+        return -1;
+    } 
 
+    // Copy the parent's user program data to the child's user program
+    memcpy(child->user_program, parent->user_program, child->user_program_size);
+    
+    // Mapping the physical memory space of the user program to the user virtual address
+    unsigned long user_program_pa = (unsigned long)VIRT_TO_PHYS(child->user_program);
+    if (mappages(child->pgd, USER_CODE_BASE, child->user_program_size, user_program_pa) != 0) {
+        dfree(child->user_program);
+        muart_puts("Error: Failed to map user program to virtual address space\r\n");
+        return 0;
+    }
+    
+    // Copy the stack state
+    memcpy(child->kernel_stack, parent->kernel_stack, THREAD_STACK_SIZE);
+    memcpy(child->user_stack, parent->user_stack, USER_STACK_SIZE);
+        
+    // Mapping the user stack to the user virtual address
+    unsigned long user_stack_pa = (unsigned long)VIRT_TO_PHYS(child->user_stack);
+    if (mappages(child->pgd, USER_STACK_BASE, USER_STACK_SIZE, user_stack_pa) != 0) {
+        dfree(child->user_program);
+        muart_puts("Error: Failed to map user stack to virtual address space\r\n");
+        return 0;
+    }
+    
+    // Mapping the VA 0x3c000000 ~ 0x3fffffff in user mode to 0x3c000000 ~ 0x3fffffff (identity mapping)
+    if (mappages(child->pgd, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, PERIPHERAL_START) != 0) {
+        muart_puts("Error: Failed to map peripheral memory to user virtual address space\r\n");
+        return 0;
+    }
     child->parent = parent;
     child->state = TASK_RUNNING;
 
-    /*
-    // Calculate memory offsets
-    long kstack_offset = (long)child->kernel_stack - (long)parent->kernel_stack;
-    long ustack_offset = (long)child->user_stack - (long)parent->user_stack;
-    */
-
+   
     // Get trap frames
     struct trap_frame* parent_tf = task_tf(parent);
     struct trap_frame* child_tf = task_tf(child);
-    
+
+
     // Copy the parent's trap frame to the child's trap frame
     memcpy(child_tf, parent_tf, sizeof(struct trap_frame));
 
@@ -189,86 +240,25 @@ int sys_fork() {
     child_tf->regs[20] = 0;
 
     // Adjust child's SP_EL0 to point to child's user stack with same offset
-    unsigned long parent_sp_offset = parent_tf->sp_el0 - (unsigned long)parent->user_stack;
-    child_tf->sp_el0 = (unsigned long)child->user_stack + parent_sp_offset;
-
-    /* 靠邀 結果是 mailbox 的問題 我這邊不改好像也沒差 ==
-    // Adjust all registers in child's trap frame that point to parent's memory
-    for (int i = 0; i < 31; i++) {
-        unsigned long reg_val = parent_tf->regs[i];
-        
-        // Check if register points into parent's user stack
-        if (reg_val >= (unsigned long)parent->user_stack && 
-            reg_val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
-            
-            child_tf->regs[i] = reg_val + ustack_offset;
-            
-            muart_puts("  Adjusted child X");
-            muart_send_dec(i);
-            muart_puts(": ");
-            muart_send_hex(reg_val);
-            muart_puts(" -> ");
-            muart_send_hex(child_tf->regs[i]);
-            muart_puts("\r\n");
-        }
-    }
-
- 
-    // 調整 child stacks 中的指標
-    unsigned long* child_ustack_ptr = (unsigned long*)child->user_stack;
-    unsigned long* child_kstack_ptr = (unsigned long*)child->kernel_stack;
-
-    // 調整 child user stack 中的指標
-    for (int i = 0; i < THREAD_STACK_SIZE / sizeof(unsigned long); i++) {
-        unsigned long val = child_ustack_ptr[i];
-        
-        // Check if this value looks like a pointer to parent's user stack
-        if (val >= (unsigned long)parent->user_stack && 
-            val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
-            
-            child_ustack_ptr[i] = val + ustack_offset;
-        }
-        // Check if this value looks like a pointer to parent's kernel stack
-        else if (val >= (unsigned long)parent->kernel_stack && 
-                val < (unsigned long)parent->kernel_stack + THREAD_STACK_SIZE) {
-            
-            child_ustack_ptr[i] = val + kstack_offset;
-        }
-    }
-
-    // 調整 child kernel stack 中的指標
-    for (int i = 0; i < THREAD_STACK_SIZE / sizeof(unsigned long); i++) {
-        unsigned long val = child_kstack_ptr[i];
-        
-        // Check if this value looks like a pointer to parent's user stack
-        if (val >= (unsigned long)parent->user_stack && 
-            val < (unsigned long)parent->user_stack + THREAD_STACK_SIZE) {
-            
-            child_kstack_ptr[i] = val + ustack_offset;
-        }
-        // Check if this value looks like a pointer to parent's kernel stack
-        else if (val >= (unsigned long)parent->kernel_stack && 
-                val < (unsigned long)parent->kernel_stack + THREAD_STACK_SIZE) {
-            
-            child_kstack_ptr[i] = val + kstack_offset;
-        }
-    }
-    */
+    unsigned long parent_sp_offset = parent_tf->sp_el0 - USER_STACK_BASE;
+    child_tf->sp_el0 = USER_STACK_BASE + parent_sp_offset;
     
-
+           
     // Set the return values
     child_tf->regs[0] = 0;  // Child returns 0
     parent_tf->regs[0] = child->pid;  // Parent returns child PID
-
+    
     // Set up child's CPU context
     memzero((unsigned long)&child->cpu_context, sizeof(struct cpu_context));
     child->cpu_context.lr = (unsigned long)ret_to_user; 
     child->cpu_context.sp = (unsigned long)child_tf;
+    child->cpu_context.phy_addr_pgd = (unsigned long)VIRT_TO_PHYS(child->pgd);
 
+    
     // Add the child task to the run queue
     INIT_LIST_HEAD(&child->list);
     list_add_tail(&child->list, &rq);
-    
+           
     // Add the child task to the task list
     INIT_LIST_HEAD(&child->task);
     list_add_tail(&child->task, &task_lists);
@@ -282,36 +272,23 @@ void sys_exit() {
     thread_exit();
 }
 
+// Input will be ch=0x8, mbox=0xffffffffedd0 in lab 6
 int sys_mbox_call(unsigned int ch, unsigned int *mbox) {
     disable_irq_in_el1();
 
-    unsigned long msg_addr = (unsigned long)mbox;
+    // Get the mailbox size from the first element of the user-provided mailbox buffer 
+    unsigned int mailbox_size = mbox[0];   // mbox[0] represents the buffer size in bytes (including the header values, the end tag and padding)
+    unsigned int mailbox_num = mailbox_size / 4; // Each content in the mailbox buffer is 32 bits (4 bytes), hence the number of elements in the mailbox buffer is mailbox_size / 4
+
+    // Declare a message buffer for the communication between the CPU and GPU
+    volatile unsigned int __attribute__((aligned(16))) mailbox[64]; // 35 in the vm.img case
+
+    memcpy((unsigned int*)&mailbox, mbox, mailbox_size); // Copy the user-provided mailbox buffer to the kernel space mailbox buffer    
+    mailbox_call(ch, (volatile unsigned int*)VIRT_TO_PHYS(&mailbox));
+    memcpy(mbox, (unsigned int*)&mailbox, mailbox_size); // Copy the mailbox buffer back to the user-provided mailbox buffer
     
-    // Combine the message address (upper 28 bits) with channel number (lower 4 bits)  
-    msg_addr = (msg_addr & ~0xF) | (ch & 0xF);
-    
-    // Check whether the Mailbox 0 status register’s full flag is set.
-    while( regRead(MAILBOX_STATUS) & MAILBOX_FULL ){
-        // Mailbox is Full: do nothing
-    }
-    // If not, then you can write the data to Mailbox 1 Read/Write register.
-    regWrite(MAILBOX_WRITE, msg_addr);
-    
-    while(1){
-        // Check whether the Mailbox 0 status register’s empty flag is set.
-        while( regRead(MAILBOX_STATUS) & MAILBOX_EMPTY ){
-            // Mailbox is Empty: do nothing
-        }
-        // If not, then you can read from Mailbox 0 Read/Write register.
-        unsigned int response = regRead(MAILBOX_READ);
-    
-        // Check if the value is the same as you wrote in step 1.
-        if((response & 0xF) == ch){
-            return;     // 這邊不要亂加 return 0，加了會狂跳 exception，原因 I don't know ==
-        }
-    }
     enable_irq_in_el1();
-    return 0;
+    return 8;
 }
 
 void sys_kill(int pid) {
